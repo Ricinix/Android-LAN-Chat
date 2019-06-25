@@ -1,6 +1,8 @@
 <resources>
+    <string name="send">发送</string>
+    <string name="activity_chat_name">聊天窗口</string>
     <string name="activity_main_name">选择用户</string>
-    <string name="app_name">ComputerNet</string>
+    <string name="app_name">计网课设</string>
     <string name="string_default">空</string>
 
     <string name="navigation_drawer_open">Open navigation drawer</string>
