@@ -16,6 +16,12 @@ import android.view.Menu
 import android.view.View
 
 class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
+    companion object{
+        var debugMode = 0
+    }
+    private val mList = mutableListOf<String>()
+    private val adapter = MsgAdapter(mList)
+    private var msgRecyclerView: RecyclerView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,7 +31,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
         val navView: NavigationView = findViewById(R.id.nav_view)
         val fab: FloatingActionButton = findViewById(R.id.fab)
-        val msgRecyclerView: RecyclerView = findViewById(R.id.msg_recycler_view)
+        msgRecyclerView = findViewById(R.id.msg_recycler_view)
         //设置toolbar
         setSupportActionBar(toolbar)
 
@@ -42,8 +48,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
         navView.setNavigationItemSelectedListener(this)
 
-        msgRecyclerView.layoutManager = LinearLayoutManager(this)
-        msgRecyclerView.adapter = MsgAdapter(listOf("aaaa", "bbbb"))
+        msgRecyclerView!!.layoutManager = LinearLayoutManager(this)
+        msgRecyclerView!!.adapter = adapter
+
     }
 
     override fun onBackPressed() {
@@ -87,6 +94,18 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
             }
             R.id.nav_tools -> {
+                if (debugMode == 0){
+                    debugMode = 1
+                    mList.add("aaa")
+                    mList.add("bbb")
+                    adapter.notifyItemChanged(mList.size - 1)
+                    msgRecyclerView!!.scrollToPosition(mList.size - 1)
+                }else{
+                    debugMode = 0
+                    mList.clear()
+                    adapter.notifyDataSetChanged()
+                    msgRecyclerView!!.scrollToPosition(0)
+                }
 
             }
             R.id.nav_share -> {

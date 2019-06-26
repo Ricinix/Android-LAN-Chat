@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout
+<LinearLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         tools:context=".ChatActivity"
-        android:id="@+id/parent">
+        android:orientation="vertical">
     <android.support.design.widget.AppBarLayout
+            android:id="@+id/bar_layout"
             android:layout_height="wrap_content"
             android:layout_width="match_parent"
-            android:theme="@style/AppTheme.AppBarOverlay"
-            app:layout_constraintTop_toTopOf="@id/parent">
+            android:theme="@style/AppTheme.AppBarOverlay">
 
         <android.support.v7.widget.Toolbar
                 android:id="@+id/toolbar_chat"
@@ -19,29 +19,38 @@
                 android:layout_height="?attr/actionBarSize"
                 app:navigationIcon="@drawable/ic_keyboard_arrow_left_black_24dp"
                 android:background="?attr/colorPrimary"
-                app:popupTheme="@style/AppTheme.PopupOverlay"
-                app:layout_scrollFlags="scroll"/>
+                app:popupTheme="@style/AppTheme.PopupOverlay"/>
 
     </android.support.design.widget.AppBarLayout>
 
-    <include layout="@layout/content_chat"/>
+    <include
+        layout="@layout/content_chat"
+        android:layout_weight="1"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        />
 
     <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/linearLayout"
-            app:layout_constraintBottom_toBottomOf="parent">
+            android:id="@+id/linearLayout">
+
         <android.support.v7.widget.AppCompatEditText
             android:id="@+id/edit_text"
-            android:layout_weight="1"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:inputType="text"/>
+            android:layout_weight="1"
+            android:inputType="text"
+            android:gravity="center_vertical"/>
         <android.support.v7.widget.AppCompatButton
                 android:id="@+id/send_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:background="@drawable/btn_bg"
+                android:textSize="20sp"
+                android:textColor="#DDDDDD"
+                android:layout_margin="5dp"
                 android:text="@string/send"/>
     </LinearLayout>
-</android.support.constraint.ConstraintLayout>
+</LinearLayout>
