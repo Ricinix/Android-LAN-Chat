@@ -12,7 +12,7 @@ import android.view.MenuItem
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 
-class ChatActivity : AppCompatActivity() {
+class ChatActivity : BaseActivity() {
 
     private val mList = mutableListOf<ChatMsg>()
     private val adapter = ChatAdapter(mList)
@@ -40,6 +40,7 @@ class ChatActivity : AppCompatActivity() {
         if (MainActivity.debugMode == 1){
             mList.add(ChatMsg("Hello", ChatMsg.TYPE_RECEIVED))
             mList.add(ChatMsg("I'm fine. Thank you. And you?", ChatMsg.TYPE_SEND))
+            adapter.notifyDataSetChanged()
         }
     }
 
@@ -57,7 +58,7 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun fileTrans(){
-        TODO()
+        return
     }
 
     private fun quit(){
