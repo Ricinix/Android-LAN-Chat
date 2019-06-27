@@ -1,10 +1,8 @@
 package com.example.computernet
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.IntentFilter
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.wifi.p2p.WifiP2pDevice
-import android.net.wifi.p2p.WifiP2pDeviceList
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Bundle
 import android.support.design.widget.FloatingActionButton
@@ -14,19 +12,20 @@ import android.support.v7.app.ActionBarDrawerToggle
 import android.view.MenuItem
 import android.support.v4.widget.DrawerLayout
 import android.support.design.widget.NavigationView
-import android.support.v7.app.AppCompatActivity
+import android.support.v4.app.ActivityCompat
+import android.support.v4.content.ContextCompat
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.Toolbar
+import android.util.Log
 import android.view.Menu
-import android.view.View
 import android.widget.Toast
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     companion object{
         var debugMode = 0
     }
-    private val mList = mutableListOf<String>()
+    private val mList = mutableListOf<WifiP2pDevice>()
     private val adapter = MsgAdapter(mList)
     private var msgRecyclerView: RecyclerView? = null
     private val context = this
@@ -48,16 +47,16 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             if (mWifiP2pManager == null)
                 Snackbar.make(view, "不支持该功能", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
-            else
-                Snackbar.make(view, "启动搜索", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show()
+
             mWifiP2pManager?.discoverPeers(mChannel, object : WifiP2pManager.ActionListener{
                 override fun onSuccess() {
-                    Toast.makeText(context, "搜索成功", Toast.LENGTH_LONG).show()
+                    Snackbar.make(view, "搜索成功", Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show()
                 }
 
                 override fun onFailure(p0: Int) {
-                    Toast.makeText(context, "搜索失败", Toast.LENGTH_LONG).show()
+                    Snackbar.make(view, "搜索失败，请打开Wifi后再试", Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show()
                 }
             })
 
@@ -72,15 +71,22 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         msgRecyclerView!!.layoutManager = LinearLayoutManager(this)
         msgRecyclerView!!.adapter = adapter
+        requestPermission(listOf(Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mWifiP2pManager?.stopPeerDiscovery(mChannel, null)
     }
 
     override fun onPeersInfo(wifiP2pDeviceList: Collection<WifiP2pDevice>) {
         mList.clear()
-        for (device in wifiP2pDeviceList){
-//            Log.e(TAG, "连接的设备是： ${device.deviceName} ------------ ${device.deviceAddress}")
-            mList.add(device.deviceName)
+        for (device: WifiP2pDevice in wifiP2pDeviceList){
+            Log.e("MainActivity", "连接的设备是： ${device.deviceName} ------------ ${device.deviceAddress}")
+            mList.add(device)
         }
         adapter.notifyDataSetChanged()
+        Toast.makeText(context, "已更新列表", Toast.LENGTH_LONG).show()
     }
 
     override fun onBackPressed() {
@@ -126,8 +132,12 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             R.id.nav_tools -> {
                 if (debugMode == 0){
                     debugMode = 1
-                    mList.add("aaa")
-                    mList.add("bbb")
+                    val deviceTest1 = WifiP2pDevice()
+                    deviceTest1.deviceName = "test device 1"
+                    mList.add(deviceTest1)
+                    val deviceTest2 = WifiP2pDevice()
+                    deviceTest2.deviceName = "test device 2"
+                    mList.add(deviceTest2)
                     adapter.notifyItemChanged(mList.size - 1)
                     msgRecyclerView!!.scrollToPosition(mList.size - 1)
                 }else{
@@ -148,5 +158,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
         drawerLayout.closeDrawer(GravityCompat.START)
         return true
+    }
+
+    private fun requestPermission(permissionList: List<String>){
+        for (permission: String in permissionList){
+            if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED){
+                ActivityCompat.requestPermissions(context, arrayOf(permission), 1)
+            }
+        }
     }
 }

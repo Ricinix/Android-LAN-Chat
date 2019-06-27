@@ -1,5 +1,6 @@
 package com.example.computernet
 
+import android.net.wifi.p2p.WifiP2pDevice
 import android.support.v7.widget.CardView
 import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
@@ -7,7 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 
-class MsgAdapter(private val mList: List<String>): RecyclerView.Adapter<MsgAdapter.ViewHolder>() {
+class MsgAdapter(private val mList: List<WifiP2pDevice>): RecyclerView.Adapter<MsgAdapter.ViewHolder>() {
 
     inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v){
         var textView: TextView? = null
@@ -28,7 +29,7 @@ class MsgAdapter(private val mList: List<String>): RecyclerView.Adapter<MsgAdapt
     override fun getItemCount(): Int =mList.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.textView!!.text = mList[position]
+        holder.textView!!.text = mList[position].deviceName
     }
 
 }

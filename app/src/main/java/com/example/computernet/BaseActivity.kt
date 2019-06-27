@@ -22,8 +22,8 @@ open class BaseActivity: AppCompatActivity(), Wifip2pActionListener {
     }
     var mWifiP2pManager: WifiP2pManager? = null
     var mChannel: WifiP2pManager.Channel? = null
-    lateinit var mWifiP2pReceiver: WifiP2pReceiver
-    lateinit var mWifiP2pInfo: WifiP2pInfo
+    private lateinit var mWifiP2pReceiver: WifiP2pReceiver
+    private lateinit var mWifiP2pInfo: WifiP2pInfo
 
     class WifiP2pReceiver(private val wifiP2pManager: WifiP2pManager?,
                           private val channel: WifiP2pManager.Channel?,
@@ -41,9 +41,9 @@ open class BaseActivity: AppCompatActivity(), Wifip2pActionListener {
                 }
                 WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
                     //当发现新可连接设备
-                    wifiP2pManager!!.requestPeers(channel) {
-                            peers -> listener.onPeersInfo(peers!!.deviceList)
-                    }
+                    Log.e(TAG, "发现新设备")
+                    val peers: WifiP2pDeviceList = intent.getParcelableExtra(WifiP2pManager.EXTRA_P2P_DEVICE_LIST)
+                    listener.onPeersInfo(peers.deviceList)
                 }
                 WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                     //设备连接发生变化
@@ -69,7 +69,6 @@ open class BaseActivity: AppCompatActivity(), Wifip2pActionListener {
         super.onCreate(savedInstanceState)
         mWifiP2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager?
         mChannel = mWifiP2pManager?.initialize(this, mainLooper, this)
-
         mWifiP2pReceiver = WifiP2pReceiver(mWifiP2pManager, mChannel, this)
     }
 
@@ -89,29 +88,30 @@ open class BaseActivity: AppCompatActivity(), Wifip2pActionListener {
     }
 
     override fun wifiP2pEnabled(enabled: Boolean) {
-        if (enabled)
-            Toast.makeText(this, "P2p可用", Toast.LENGTH_LONG).show()
-        else
-            Toast.makeText(this, "P2p不可用", Toast.LENGTH_LONG).show()
+        if (!enabled)
+            Toast.makeText(this, "P2p不可用，请打开Wifi后再尝试", Toast.LENGTH_LONG).show()
     }
 
     override fun onConnection(wifiP2pInfo: WifiP2pInfo) {
         mWifiP2pInfo = wifiP2pInfo
-        Toast.makeText(this, "Info: $wifiP2pInfo", Toast.LENGTH_LONG).show()
+//        Toast.makeText(this, "Info: $wifiP2pInfo", Toast.LENGTH_LONG).show()
+        Log.e(TAG, "info: $mWifiP2pInfo")
     }
 
     override fun onDisconnection() {
-        Toast.makeText(this, "连接断开", Toast.LENGTH_LONG).show()
+//        Toast.makeText(this, "连接断开", Toast.LENGTH_LONG).show()
+        Log.e(TAG, "连接断开")
     }
 
     override fun onDeviceInfo(wifiP2pDevice: WifiP2pDevice) {
-        Toast.makeText(this, "当前设备名字 ${wifiP2pDevice.deviceName}", Toast.LENGTH_LONG).show()
+//        Toast.makeText(this, "当前设备名字 ${wifiP2pDevice.deviceName}", Toast.LENGTH_LONG).show()
+        Log.e(TAG, "当前设备名字 ${wifiP2pDevice.deviceName}")
     }
 
     override fun onPeersInfo(wifiP2pDeviceList: Collection<WifiP2pDevice>){
         val deviceNameList = mutableListOf<String>()
         for (device in wifiP2pDeviceList){
-//            Log.e(TAG, "连接的设备是： ${device.deviceName} ------------ ${device.deviceAddress}")
+//           Log.e(TAG, "连接的设备是： ${device.deviceName} ------------ ${device.deviceAddress}")
             deviceNameList.add(device.deviceName)
         }
     }
