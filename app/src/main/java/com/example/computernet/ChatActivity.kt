@@ -6,11 +6,13 @@ import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pManager
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.support.v7.widget.AppCompatButton
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.Toolbar
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.Toast
@@ -20,11 +22,13 @@ class ChatActivity : BaseActivity() {
     private val mList = mutableListOf<ChatMsg>()
     private val adapter = ChatAdapter(mList)
     private var recyclerView: RecyclerView? = null
+    private var deviceAddress: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
 
+        val sendButton: AppCompatButton = findViewById(R.id.send_button)
         val toolbar: Toolbar = findViewById(R.id.toolbar_chat)
         val editText: EditText = findViewById(R.id.edit_text)
         recyclerView = findViewById(R.id.recycler_chat)
@@ -33,9 +37,14 @@ class ChatActivity : BaseActivity() {
 
         editText.setOnEditorActionListener { textView, i, keyEvent ->
             if (i == EditorInfo.IME_ACTION_DONE){
+                send(editText.text.toString())
                 editText.setText("")
             }
             false
+        }
+        sendButton.setOnClickListener {
+            send(editText.text.toString())
+            editText.setText("")
         }
 
         recyclerView!!.layoutManager = LinearLayoutManager(this)
@@ -47,7 +56,8 @@ class ChatActivity : BaseActivity() {
         }
 
         val config = WifiP2pConfig()
-        config.deviceAddress = intent.getStringExtra("deviceAddress")
+        deviceAddress = intent.getStringExtra("deviceAddress")
+        config.deviceAddress = deviceAddress
         toolbar.title = "聊天窗口 - ${intent.getStringExtra("deviceName")}"
         mWifiP2pManager?.connect(mChannel, config, object : WifiP2pManager.ActionListener{
             override fun onSuccess() {
@@ -72,6 +82,16 @@ class ChatActivity : BaseActivity() {
             R.id.action_file_send -> fileTrans()
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    private fun send(msgText: String){
+        val serviceIntent = Intent(this, WifiP2pSendService::class.java)
+        serviceIntent.action = WifiP2pSendService.ACTION_SEND_MSG
+        serviceIntent.putExtra(WifiP2pSendService.MSG_CONTENT, msgText)
+        serviceIntent.putExtra(WifiP2pSendService.EXTRAS_ADDRESS, deviceAddress)
+        serviceIntent.putExtra(WifiP2pSendService.EXTRAS_GROUP_OWNER_PORT, 8988)
+        startService(serviceIntent)
+        mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
     }
 
     private fun fileTrans(){

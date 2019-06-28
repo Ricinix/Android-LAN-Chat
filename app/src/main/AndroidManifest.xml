@@ -19,13 +19,16 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <service
-            android:name=".WifiP2pReceiverService"
+            android:name=".WifiP2pSendService"
             android:exported="false"></service>
+        <service
+            android:name=".WifiP2pReceiverService"
+            android:exported="false" />
 
         <activity
             android:name=".ChatActivity"
             android:label="@string/activity_chat_name"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTask"

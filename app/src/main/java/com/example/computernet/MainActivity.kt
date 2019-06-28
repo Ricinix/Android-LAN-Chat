@@ -142,9 +142,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                     debugMode = 1
                     val deviceTest1 = WifiP2pDevice()
                     deviceTest1.deviceName = "test device 1"
+                    deviceTest1.deviceAddress = "123"
+                    deviceTest1.status = WifiP2pDevice.AVAILABLE
                     mList.add(deviceTest1)
                     val deviceTest2 = WifiP2pDevice()
                     deviceTest2.deviceName = "test device 2"
+                    deviceTest2.deviceAddress = "321"
+                    deviceTest2.status = WifiP2pDevice.AVAILABLE
                     mList.add(deviceTest2)
                     adapter.notifyItemChanged(mList.size - 1)
                     msgRecyclerView!!.scrollToPosition(mList.size - 1)

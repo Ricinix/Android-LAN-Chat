@@ -28,7 +28,7 @@ class MsgAdapter(private val mList: List<WifiP2pDevice>, private val activity: M
                 WifiP2pDevice.AVAILABLE ->
                     ChatActivity.startThisActivity(parent.context, device.deviceName, device.deviceAddress)
                 WifiP2pDevice.CONNECTED ->
-                    activity.removeConnect()
+                    Toast.makeText(parent.context, "已连接", Toast.LENGTH_LONG).show()
                 WifiP2pDevice.FAILED ->
                     Toast.makeText(parent.context, "连接失败", Toast.LENGTH_LONG).show()
                 WifiP2pDevice.INVITED ->
