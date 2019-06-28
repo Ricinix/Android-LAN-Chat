@@ -1,0 +1,64 @@
+package com.example.computernet.service
+
+import android.app.IntentService
+import android.content.Intent
+import android.support.v4.content.LocalBroadcastManager
+import android.util.Log
+import java.lang.Exception
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
+
+class SendService : IntentService("SendService") {
+    companion object{
+        const val SEND_FINISH: String = "send_finsih"
+        const val CONTENT: String = "msg_text"
+        const val IP_ADDRESS: String = "ip_address"
+        const val PORT: String = "port"
+    }
+    private var responseMsg: String = ""
+    private lateinit var mLocalBroadcastManager: LocalBroadcastManager
+    override fun onCreate() {
+        super.onCreate()
+        mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
+    }
+
+    override fun onHandleIntent(intent: Intent?) {
+        val msg: String? = intent?.getStringExtra(CONTENT)
+        val ipAddress: String? = intent?.getStringExtra(IP_ADDRESS)
+        val port: Int? = intent?.getIntExtra(PORT, 11791)
+        val client = DatagramSocket()
+        try {
+            val sendBytes: ByteArray? = msg?.toByteArray()
+            val address: InetAddress = InetAddress.getByName(ipAddress)
+            val sendPacket = DatagramPacket(sendBytes, sendBytes!!.size, address, port!!)
+
+            try {
+                client.send(sendPacket)
+            }catch (e: Exception){
+                e.printStackTrace()
+            }
+
+//            val responseBytes = ByteArray(2048)
+//            val responsePacket= DatagramPacket(responseBytes,responseBytes.size)
+//
+//            try {
+//                client.receive(responsePacket)
+//            }catch (e: Exception){
+//                e.printStackTrace()
+//            }
+//            responseMsg = String(responsePacket.data,0,responsePacket.length)
+        }catch (e: Exception){
+            e.printStackTrace()
+        }finally {
+            client.close()
+        }
+        sendFinish()
+    }
+
+    private fun sendFinish(){
+        Log.e("SendService", "成功发送消息")
+        val intent = Intent(SEND_FINISH)
+        mLocalBroadcastManager.sendBroadcast(intent)
+    }
+}

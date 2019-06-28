@@ -1,9 +1,12 @@
 package com.example.computernet
 
-import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.wifi.p2p.WifiP2pDevice
-import android.net.wifi.p2p.WifiP2pManager
+import android.net.DhcpInfo
+import android.net.wifi.WifiInfo
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.support.design.widget.FloatingActionButton
 import android.support.design.widget.Snackbar
@@ -19,13 +22,16 @@ import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.Toolbar
 import android.util.Log
 import android.view.Menu
-import android.widget.Toast
+import com.example.computernet.service.SendService
+import com.example.computernet.service.ServerService
+import java.net.InetAddress
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     companion object{
         var debugMode = 0
     }
-    private val mList = mutableListOf<WifiP2pDevice>()
+    private var localIp: String = ""
+    private val mList = mutableListOf<DeviceInfo>()
     private val adapter = MsgAdapter(mList, this)
     private var msgRecyclerView: RecyclerView? = null
     private val context = this
@@ -44,22 +50,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         //设置悬浮按钮，点击则搜索
         fab.setOnClickListener { view ->
-            if (mWifiP2pManager == null)
-                Snackbar.make(view, "不支持该功能", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show()
-
-            mWifiP2pManager?.discoverPeers(mChannel, object : WifiP2pManager.ActionListener{
-                override fun onSuccess() {
-                    Snackbar.make(view, "搜索成功", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show()
-                }
-
-                override fun onFailure(p0: Int) {
-                    Snackbar.make(view, "搜索失败，请打开Wifi后再试", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show()
-                }
-            })
-
+            searchIp()
+            Snackbar.make(view, "成功告诉别人我在哪", Snackbar.LENGTH_LONG).setAction("action", null).show()
         }
         val toggle = ActionBarDrawerToggle(
             this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close
@@ -71,30 +63,60 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         msgRecyclerView!!.layoutManager = LinearLayoutManager(this)
         msgRecyclerView!!.adapter = adapter
-        requestPermission(listOf(Manifest.permission.ACCESS_COARSE_LOCATION))
+
+        val wifiManager = getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val dhcpInfo:DhcpInfo = wifiManager.dhcpInfo
+        localIp = intToIp(dhcpInfo.ipAddress)
+        deviceAddress = getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)
+        Log.e("MainActivity", "ip地址：${intToIp(dhcpInfo.ipAddress)}")
+        Log.e("MainActivity", "子网掩码：${intToIp(dhcpInfo.netmask)}")
+        Log.e("MainActivity", "广播号：${getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)}")
+
+        send("#port:11691#ip:$localIp")
     }
 
-    override fun onPause() {
-        super.onPause()
-        mWifiP2pManager?.stopPeerDiscovery(mChannel, null)
-    }
-
-    override fun onPeersInfo(wifiP2pDeviceList: Collection<WifiP2pDevice>) {
-        mList.clear()
-        for (device: WifiP2pDevice in wifiP2pDeviceList){
-            Log.e("MainActivity", "连接的设备是： ${device.deviceName} ------------ ${device.deviceAddress}")
-            mList.add(device)
+    private fun refreshDeviceList(device: DeviceInfo){
+        var has = false
+        for (de in mList){
+            if (device.address == de.address)
+                has = true
         }
-        adapter.notifyDataSetChanged()
-        Toast.makeText(context, "已更新列表", Toast.LENGTH_LONG).show()
+        if (!has){
+            mList.add(device)
+            adapter.notifyItemChanged(mList.size - 1)
+            msgRecyclerView!!.scrollToPosition(mList.size - 1)
+        }
     }
 
-    fun cancelInvite(){
-        mWifiP2pManager?.cancelConnect(mChannel, null)
+    private fun startServer(port: Int, localIp: String){
+        val intent = Intent(this, ServerService::class.java)
+        intent.putExtra(ServerService.IP_ADDRESS, localIp)
+        intent.putExtra(ServerService.PORT, port)
+        startService(intent)
     }
 
-    fun removeConnect(){
-        mWifiP2pManager?.removeGroup(mChannel, null)
+    private fun searchIp(){
+        stopService(Intent(this, ServerService::class.java))
+        send("#port:11691#ip:$localIp")
+    }
+
+    private fun send(msgText: String){
+        val intent = Intent(this, SendService::class.java)
+        intent.putExtra(SendService.CONTENT, msgText)
+        intent.putExtra(SendService.IP_ADDRESS, deviceAddress)
+        intent.putExtra(SendService.PORT, sendPort)
+        startService(intent)
+    }
+
+    private fun intToIp(paramInt: Int): String {
+        return ((paramInt and 0xFF).toString() + "." + (0xFF and (paramInt shr 8)) + "." + (0xFF and (paramInt shr 16)) + "."
+                + (0xFF and (paramInt shr 24)))
+    }
+
+    private fun getBroadcastIp(ip: Int, netMask: Int): String{
+        var net: Int = ip and netMask
+        net = net or netMask.inv()
+        return intToIp(net)
     }
 
     override fun onBackPressed() {
@@ -140,15 +162,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             R.id.nav_tools -> {
                 if (debugMode == 0){
                     debugMode = 1
-                    val deviceTest1 = WifiP2pDevice()
-                    deviceTest1.deviceName = "test device 1"
-                    deviceTest1.deviceAddress = "123"
-                    deviceTest1.status = WifiP2pDevice.AVAILABLE
+                    val deviceTest1 = DeviceInfo("test device 1", 123)
                     mList.add(deviceTest1)
-                    val deviceTest2 = WifiP2pDevice()
-                    deviceTest2.deviceName = "test device 2"
-                    deviceTest2.deviceAddress = "321"
-                    deviceTest2.status = WifiP2pDevice.AVAILABLE
+                    val deviceTest2 = DeviceInfo("test device 2", 321)
                     mList.add(deviceTest2)
                     adapter.notifyItemChanged(mList.size - 1)
                     msgRecyclerView!!.scrollToPosition(mList.size - 1)
@@ -178,5 +194,20 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 ActivityCompat.requestPermissions(context, arrayOf(permission), 1)
             }
         }
+    }
+
+    inner class ServiceBroadcastReceiver: BroadcastReceiver(){
+        override fun onReceive(p0: Context?, intent: Intent?) {
+            when (intent?.action){
+                SendService.SEND_FINISH -> startServer(serverPort, localIp)
+                ServerService.RECEIVE_MSG -> {
+                    val msg: String = intent.getStringExtra("msg")
+                    val address: String? = Regex("#ip:.*?").find(msg)?.value
+                    val port: Int? = Regex("#port:.*?").find(msg)?.value?.toInt()
+                    refreshDeviceList(DeviceInfo(address!!, port!!))
+                }
+            }
+        }
+
     }
 }

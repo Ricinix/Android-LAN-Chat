@@ -1,15 +1,14 @@
 package com.example.computernet
 
-import android.net.wifi.p2p.WifiP2pDevice
+import android.content.Context
 import android.support.v7.widget.CardView
 import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import android.widget.Toast
 
-class MsgAdapter(private val mList: List<WifiP2pDevice>, private val activity: MainActivity): RecyclerView.Adapter<MsgAdapter.ViewHolder>() {
+class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Context): RecyclerView.Adapter<MsgAdapter.ViewHolder>() {
 
     inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v){
         var textView: TextView? = null
@@ -24,20 +23,7 @@ class MsgAdapter(private val mList: List<WifiP2pDevice>, private val activity: M
         val holder = ViewHolder(cardView)
         cardView.setOnClickListener{
             val device = mList[holder.adapterPosition]
-            when (device.status){
-                WifiP2pDevice.AVAILABLE ->{
-                    activity.mWifiP2pManager?.stopPeerDiscovery(activity.mChannel, null)
-                    ChatActivity.startThisActivity(parent.context, device.deviceName, device.deviceAddress)
-                }
-                WifiP2pDevice.CONNECTED ->
-                    Toast.makeText(parent.context, "已连接", Toast.LENGTH_LONG).show()
-                WifiP2pDevice.FAILED ->
-                    Toast.makeText(parent.context, "连接失败", Toast.LENGTH_LONG).show()
-                WifiP2pDevice.INVITED ->
-                    activity.cancelInvite()
-                WifiP2pDevice.UNAVAILABLE ->
-                    Toast.makeText(parent.context, "不可连接", Toast.LENGTH_LONG).show()
-            }
+            ChatActivity.startThisActivity(context, device.address, device.port)
         }
         return holder
     }
@@ -45,7 +31,7 @@ class MsgAdapter(private val mList: List<WifiP2pDevice>, private val activity: M
     override fun getItemCount(): Int =mList.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.textView!!.text = mList[position].deviceName
+        holder.textView!!.text = mList[position].address
     }
 
 }

@@ -26,15 +26,10 @@ import java.net.Socket
 
 class ChatActivity : BaseActivity() {
 
-    private var sendMsg: String = "10196"
     private var firstChat: Boolean = true
-    private var sendPort: Int = 8988
-    private var serverPort: Int = 8988
     private val mList = mutableListOf<ChatMsg>()
     private val adapter = ChatAdapter(mList)
     private var recyclerView: RecyclerView? = null
-    private var deviceAddress: String = ""
-    private val serverTask = ServerAsyncTask()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
@@ -48,15 +43,13 @@ class ChatActivity : BaseActivity() {
 
         editText.setOnEditorActionListener { textView, i, keyEvent ->
             if (i == EditorInfo.IME_ACTION_DONE){
-                sendMsg = editText.text.toString()
-                send()
+                editText.text.toString()
                 editText.setText("")
             }
             false
         }
         sendButton.setOnClickListener {
-            sendMsg = editText.text.toString()
-            send()
+            editText.text.toString()
             editText.setText("")
         }
 
@@ -68,25 +61,9 @@ class ChatActivity : BaseActivity() {
             adapter.notifyDataSetChanged()
         }
 
-        val config = WifiP2pConfig()
         deviceAddress = intent.getStringExtra("deviceAddress")
-        config.deviceAddress = deviceAddress
-        config.wps.setup = WpsInfo.PBC
-        toolbar.title = "聊天窗口 - ${intent.getStringExtra("deviceName")}"
-        mWifiP2pManager?.connect(mChannel, config, object : WifiP2pManager.ActionListener{
-            override fun onSuccess() {
-                Toast.makeText(this@ChatActivity, "连接成功", Toast.LENGTH_LONG).show()
-                Log.e("ChatActivity", "连接成功")
-            }
+        toolbar.title = "聊天窗口 - ${intent.getStringExtra("deviceAddress")}"
 
-            override fun onFailure(p0: Int) {
-                Toast.makeText(this@ChatActivity, "连接失败", Toast.LENGTH_LONG).show()
-                Log.e("ChatActivity", "连接失败")
-            }
-
-        })
-
-        send()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -102,14 +79,7 @@ class ChatActivity : BaseActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    private fun send(){
-        serverTask.cancel(true)
-        sendMessage()
-    }
 
-    private fun sendMessage(){
-        SendAsyncTask(sendMsg).execute()
-    }
 
     private fun receive(msgText: String){
         mList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
@@ -119,8 +89,7 @@ class ChatActivity : BaseActivity() {
         if (firstChat){
             serverPort = msgText.toInt()
             sendPort = serverPort + 96
-            sendMsg = sendPort.toString()
-            send()
+            sendPort.toString()
             firstChat = false
         }
     }
@@ -135,88 +104,11 @@ class ChatActivity : BaseActivity() {
         finish()
     }
 
-    inner class ServerAsyncTask: AsyncTask<Unit, Unit, Unit>() {
-        private var msgText:String = ""
-
-        override fun doInBackground(vararg p0: Unit?) {
-            while (!isCancelled){
-                try {
-                    val serverSocket = ServerSocket(serverPort)
-                    Log.e("ServerAsyncTask", "服务器开启")
-                    val client: Socket = serverSocket.accept()
-                    Log.e("ServerAsyncTask", "服务器连接")
-                    val inputStream: InputStream = client.getInputStream()
-                    val baoS = ByteArrayOutputStream()
-                    copy(inputStream, baoS)
-                    msgText = baoS.toString()
-                    serverSocket.close()
-                }catch (e: IOException){
-                    Log.e("ServerAsyncTask", e.message)
-                }
-                receive(msgText)
-            }
-            sendMessage()
-        }
-    }
-
-    inner class SendAsyncTask(private val msgText: String): AsyncTask<String, Unit, Unit>(){
-        override fun doInBackground(vararg p0: String) {
-            val socket = Socket()
-            try {
-                Log.e("WifiP2pSendService", "正在打开服务端")
-                socket.bind(null)
-                socket.connect(InetSocketAddress(deviceAddress, sendPort), 5000)
-
-                Log.e("WifiP2pSendService", "socket状态： ${socket.isConnected}")
-                val stream: OutputStream = socket.getOutputStream()
-//                val cr: ContentResolver = application.contentResolver
-                val inputS: InputStream = ByteArrayInputStream(msgText.toByteArray())
-                copy(inputS, stream)
-
-
-            }catch (e: IOException){
-                Log.e("WifiP2pSendService", e.message)
-            }finally {
-                if (socket.isConnected){
-                    try {
-                        socket.close()
-                    }catch (e: IOException){
-                        e.printStackTrace()
-                    }
-                }
-            }
-        }
-
-        override fun onPostExecute(result: Unit?) {
-            mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
-            adapter.notifyItemChanged(mList.size - 1)
-            recyclerView!!.scrollToPosition(mList.size - 1)
-            serverTask.cancel(false)
-        }
-    }
-
-    private fun copy(inputStream: InputStream, out: OutputStream){
-        val buf = ByteArray(1024)
-        var len: Int
-        try {
-            len = inputStream.read(buf)
-            while (len != -1) {
-                out.write(buf, 0, len)
-                len = inputStream.read(buf)
-            }
-            out.close()
-            inputStream.close()
-        } catch (e: IOException) {
-            Log.d("WifiP2pSendService", e.toString())
-        }
-
-    }
-
     companion object {
         @JvmStatic
-        fun startThisActivity(context: Context, deviceName: String, deviceAddress: String){
+        fun startThisActivity(context: Context, deviceAddress: String, devicePort: Int){
             val intent = Intent(context, ChatActivity::class.java)
-            intent.putExtra("deviceName", deviceName)
+            intent.putExtra("devicePort", devicePort)
             intent.putExtra("deviceAddress", deviceAddress)
             context.startActivity(intent)
         }
