@@ -4,26 +4,35 @@ import android.content.Context
 import android.content.Intent
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pManager
+import android.os.AsyncTask
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v7.widget.AppCompatButton
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.Toolbar
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.Toast
+import java.io.*
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
 
 class ChatActivity : BaseActivity() {
 
+    private var firstChat: Boolean = true
+    private var sendPort: Int = 8988
+    private var serverPort: Int = 8988
     private val mList = mutableListOf<ChatMsg>()
     private val adapter = ChatAdapter(mList)
     private var recyclerView: RecyclerView? = null
     private var deviceAddress: String = ""
-
+    private val serverTask = ServerAsyncTask()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
@@ -69,6 +78,9 @@ class ChatActivity : BaseActivity() {
             }
 
         })
+
+        send("10196")
+        serverTask.execute()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -85,13 +97,21 @@ class ChatActivity : BaseActivity() {
     }
 
     private fun send(msgText: String){
-        val serviceIntent = Intent(this, WifiP2pSendService::class.java)
-        serviceIntent.action = WifiP2pSendService.ACTION_SEND_MSG
-        serviceIntent.putExtra(WifiP2pSendService.MSG_CONTENT, msgText)
-        serviceIntent.putExtra(WifiP2pSendService.EXTRAS_ADDRESS, deviceAddress)
-        serviceIntent.putExtra(WifiP2pSendService.EXTRAS_GROUP_OWNER_PORT, 8988)
-        startService(serviceIntent)
-        mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
+        serverTask.cancel(true)
+        SendAsyncTask(msgText).execute()
+    }
+
+    private fun receive(msgText: String){
+        mList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
+        adapter.notifyItemChanged(mList.size - 1)
+        recyclerView!!.scrollToPosition(mList.size - 1)
+
+        if (firstChat){
+            serverPort = msgText.toInt()
+            sendPort = serverPort + 96
+            send(sendPort.toString())
+            firstChat = false
+        }
     }
 
     private fun fileTrans(){
@@ -102,6 +122,82 @@ class ChatActivity : BaseActivity() {
         val intent = Intent(this, MainActivity::class.java)
         startActivity(intent)
         finish()
+    }
+
+    inner class ServerAsyncTask: AsyncTask<Unit, Unit, Unit>() {
+        private var msgText:String = ""
+
+        override fun doInBackground(vararg p0: Unit?) {
+            while (true){
+                try {
+                    val serverSocket = ServerSocket(serverPort)
+                    Log.e("ServerAsyncTask", "服务器开启")
+                    val client: Socket = serverSocket.accept()
+                    Log.e("ServerAsyncTask", "服务器连接")
+                    val inputStream: InputStream = client.getInputStream()
+                    val baoS = ByteArrayOutputStream()
+                    copy(inputStream, baoS)
+                    msgText = baoS.toString()
+                    serverSocket.close()
+                }catch (e: IOException){
+                    Log.e("ServerAsyncTask", e.message)
+                }
+                receive(msgText)
+            }
+        }
+    }
+
+    inner class SendAsyncTask(private val msgText: String): AsyncTask<String, Unit, Unit>(){
+        override fun doInBackground(vararg p0: String) {
+            val socket = Socket()
+            try {
+                Log.e("WifiP2pSendService", "正在打开服务端")
+                socket.bind(null)
+                socket.connect(InetSocketAddress(deviceAddress, sendPort), 5000)
+
+                Log.e("WifiP2pSendService", "socket状态： ${socket.isConnected}")
+                val stream: OutputStream = socket.getOutputStream()
+//                val cr: ContentResolver = application.contentResolver
+                val inputS: InputStream = ByteArrayInputStream(msgText.toByteArray())
+                copy(inputS, stream)
+
+
+            }catch (e: IOException){
+                Log.e("WifiP2pSendService", e.message)
+            }finally {
+                if (socket.isConnected){
+                    try {
+                        socket.close()
+                    }catch (e: IOException){
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
+        override fun onPostExecute(result: Unit?) {
+            mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
+            adapter.notifyItemChanged(mList.size - 1)
+            recyclerView!!.scrollToPosition(mList.size - 1)
+            serverTask.execute()
+        }
+    }
+
+    private fun copy(inputStream: InputStream, out: OutputStream){
+        val buf = ByteArray(1024)
+        var len: Int
+        try {
+            len = inputStream.read(buf)
+            while (len != -1) {
+                out.write(buf, 0, len)
+                len = inputStream.read(buf)
+            }
+            out.close()
+            inputStream.close()
+        } catch (e: IOException) {
+            Log.d("WifiP2pSendService", e.toString())
+        }
+
     }
 
     companion object {
