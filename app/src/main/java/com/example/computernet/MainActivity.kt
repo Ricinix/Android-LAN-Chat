@@ -26,7 +26,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         var debugMode = 0
     }
     private val mList = mutableListOf<WifiP2pDevice>()
-    private val adapter = MsgAdapter(mList)
+    private val adapter = MsgAdapter(mList, this)
     private var msgRecyclerView: RecyclerView? = null
     private val context = this
 
@@ -87,6 +87,14 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
         adapter.notifyDataSetChanged()
         Toast.makeText(context, "已更新列表", Toast.LENGTH_LONG).show()
+    }
+
+    fun cancelInvite(){
+        mWifiP2pManager?.cancelConnect(mChannel, null)
+    }
+
+    fun removeConnect(){
+        mWifiP2pManager?.removeGroup(mChannel, null)
     }
 
     override fun onBackPressed() {

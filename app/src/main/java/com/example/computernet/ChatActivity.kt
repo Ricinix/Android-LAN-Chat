@@ -2,6 +2,8 @@ package com.example.computernet
 
 import android.content.Context
 import android.content.Intent
+import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pManager
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v7.widget.LinearLayoutManager
@@ -11,6 +13,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.Toast
 
 class ChatActivity : BaseActivity() {
 
@@ -42,6 +45,20 @@ class ChatActivity : BaseActivity() {
             mList.add(ChatMsg("I'm fine. Thank you. And you?", ChatMsg.TYPE_SEND))
             adapter.notifyDataSetChanged()
         }
+
+        val config = WifiP2pConfig()
+        config.deviceAddress = intent.getStringExtra("deviceAddress")
+        toolbar.title = "聊天窗口 - ${intent.getStringExtra("deviceName")}"
+        mWifiP2pManager?.connect(mChannel, config, object : WifiP2pManager.ActionListener{
+            override fun onSuccess() {
+                Toast.makeText(this@ChatActivity, "连接成功", Toast.LENGTH_LONG).show()
+            }
+
+            override fun onFailure(p0: Int) {
+                Toast.makeText(this@ChatActivity, "连接失败", Toast.LENGTH_LONG).show()
+            }
+
+        })
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -69,8 +86,10 @@ class ChatActivity : BaseActivity() {
 
     companion object {
         @JvmStatic
-        fun startThisActivity(context: Context){
+        fun startThisActivity(context: Context, deviceName: String, deviceAddress: String){
             val intent = Intent(context, ChatActivity::class.java)
+            intent.putExtra("deviceName", deviceName)
+            intent.putExtra("deviceAddress", deviceAddress)
             context.startActivity(intent)
         }
     }
