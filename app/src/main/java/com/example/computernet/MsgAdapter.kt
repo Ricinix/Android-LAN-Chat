@@ -25,8 +25,10 @@ class MsgAdapter(private val mList: List<WifiP2pDevice>, private val activity: M
         cardView.setOnClickListener{
             val device = mList[holder.adapterPosition]
             when (device.status){
-                WifiP2pDevice.AVAILABLE ->
+                WifiP2pDevice.AVAILABLE ->{
+                    activity.mWifiP2pManager?.stopPeerDiscovery(activity.mChannel, null)
                     ChatActivity.startThisActivity(parent.context, device.deviceName, device.deviceAddress)
+                }
                 WifiP2pDevice.CONNECTED ->
                     Toast.makeText(parent.context, "已连接", Toast.LENGTH_LONG).show()
                 WifiP2pDevice.FAILED ->

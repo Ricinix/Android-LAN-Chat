@@ -2,6 +2,7 @@ package com.example.computernet
 
 import android.content.Context
 import android.content.Intent
+import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.AsyncTask
@@ -25,6 +26,7 @@ import java.net.Socket
 
 class ChatActivity : BaseActivity() {
 
+    private var sendMsg: String = "10196"
     private var firstChat: Boolean = true
     private var sendPort: Int = 8988
     private var serverPort: Int = 8988
@@ -46,13 +48,15 @@ class ChatActivity : BaseActivity() {
 
         editText.setOnEditorActionListener { textView, i, keyEvent ->
             if (i == EditorInfo.IME_ACTION_DONE){
-                send(editText.text.toString())
+                sendMsg = editText.text.toString()
+                send()
                 editText.setText("")
             }
             false
         }
         sendButton.setOnClickListener {
-            send(editText.text.toString())
+            sendMsg = editText.text.toString()
+            send()
             editText.setText("")
         }
 
@@ -67,20 +71,22 @@ class ChatActivity : BaseActivity() {
         val config = WifiP2pConfig()
         deviceAddress = intent.getStringExtra("deviceAddress")
         config.deviceAddress = deviceAddress
+        config.wps.setup = WpsInfo.PBC
         toolbar.title = "聊天窗口 - ${intent.getStringExtra("deviceName")}"
         mWifiP2pManager?.connect(mChannel, config, object : WifiP2pManager.ActionListener{
             override fun onSuccess() {
                 Toast.makeText(this@ChatActivity, "连接成功", Toast.LENGTH_LONG).show()
+                Log.e("ChatActivity", "连接成功")
             }
 
             override fun onFailure(p0: Int) {
                 Toast.makeText(this@ChatActivity, "连接失败", Toast.LENGTH_LONG).show()
+                Log.e("ChatActivity", "连接失败")
             }
 
         })
 
-        send("10196")
-        serverTask.execute()
+        send()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -96,9 +102,13 @@ class ChatActivity : BaseActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    private fun send(msgText: String){
+    private fun send(){
         serverTask.cancel(true)
-        SendAsyncTask(msgText).execute()
+        sendMessage()
+    }
+
+    private fun sendMessage(){
+        SendAsyncTask(sendMsg).execute()
     }
 
     private fun receive(msgText: String){
@@ -109,7 +119,8 @@ class ChatActivity : BaseActivity() {
         if (firstChat){
             serverPort = msgText.toInt()
             sendPort = serverPort + 96
-            send(sendPort.toString())
+            sendMsg = sendPort.toString()
+            send()
             firstChat = false
         }
     }
@@ -128,7 +139,7 @@ class ChatActivity : BaseActivity() {
         private var msgText:String = ""
 
         override fun doInBackground(vararg p0: Unit?) {
-            while (true){
+            while (!isCancelled){
                 try {
                     val serverSocket = ServerSocket(serverPort)
                     Log.e("ServerAsyncTask", "服务器开启")
@@ -144,6 +155,7 @@ class ChatActivity : BaseActivity() {
                 }
                 receive(msgText)
             }
+            sendMessage()
         }
     }
 
@@ -179,7 +191,7 @@ class ChatActivity : BaseActivity() {
             mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
             adapter.notifyItemChanged(mList.size - 1)
             recyclerView!!.scrollToPosition(mList.size - 1)
-            serverTask.execute()
+            serverTask.cancel(false)
         }
     }
 
