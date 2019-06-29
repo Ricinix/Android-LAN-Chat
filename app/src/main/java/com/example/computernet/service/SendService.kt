@@ -16,7 +16,7 @@ class SendService : IntentService("SendService") {
         const val IP_ADDRESS: String = "ip_address"
         const val PORT: String = "port"
     }
-    private var responseMsg: String = ""
+    private var msg: String? = ""
     private lateinit var mLocalBroadcastManager: LocalBroadcastManager
     override fun onCreate() {
         super.onCreate()
@@ -24,7 +24,7 @@ class SendService : IntentService("SendService") {
     }
 
     override fun onHandleIntent(intent: Intent?) {
-        val msg: String? = intent?.getStringExtra(CONTENT)
+        msg = intent?.getStringExtra(CONTENT)
         val ipAddress: String? = intent?.getStringExtra(IP_ADDRESS)
         val port: Int? = intent?.getIntExtra(PORT, 11791)
         val client = DatagramSocket()
@@ -59,6 +59,7 @@ class SendService : IntentService("SendService") {
     private fun sendFinish(){
         Log.e("SendService", "成功发送消息")
         val intent = Intent(SEND_FINISH)
+        intent.putExtra("msg", msg)
         mLocalBroadcastManager.sendBroadcast(intent)
     }
 }

@@ -17,7 +17,6 @@ import android.support.v4.widget.DrawerLayout
 import android.support.design.widget.NavigationView
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
-import android.support.v4.content.LocalBroadcastManager
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.Toolbar
@@ -36,7 +35,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private var msgRecyclerView: RecyclerView? = null
     private val context = this
     private val receiver: ServiceBroadcastReceiver = ServiceBroadcastReceiver()
-    private lateinit var mLocalBroadcastManager: LocalBroadcastManager
     private lateinit var wifiManager: WifiManager
     private lateinit var dhcpInfo: DhcpInfo
 
@@ -77,8 +75,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         Log.e("MainActivity", "网关：${intToIp(dhcpInfo.gateway)}")
 
         send("#port:11691#ip:$localIp#")
-        startServer(serverPort, localIp)
-        mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
+        startServer(serverPort)
     }
 
     private fun refreshDeviceList(device: DeviceInfo){
@@ -94,24 +91,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             adapter.notifyItemChanged(mList.size - 1)
             msgRecyclerView!!.scrollToPosition(mList.size - 1)
         }
-    }
-
-    private fun stopServer(){
-        mLocalBroadcastManager.sendBroadcast(Intent(ServerService.STOP_SERVER))
-    }
-
-    private fun startServer(port: Int, localIp: String){
-        val intent = Intent(this, ServerService::class.java)
-        intent.putExtra(ServerService.PORT, port)
-        startService(intent)
-    }
-
-    private fun send(msgText: String){
-        val intent = Intent(this, SendService::class.java)
-        intent.putExtra(SendService.CONTENT, msgText)
-        intent.putExtra(SendService.IP_ADDRESS, deviceAddress)
-        intent.putExtra(SendService.PORT, sendPort)
-        startService(intent)
     }
 
     private fun intToIp(paramInt: Int): String {

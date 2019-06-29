@@ -97,6 +97,5 @@ class ServerService : IntentService("ServerService") {
                 }
             }
         }
-
     }
 }

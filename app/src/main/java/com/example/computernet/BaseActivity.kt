@@ -1,8 +1,13 @@
 package com.example.computernet
 
+import android.content.Intent
 import android.os.AsyncTask
+import android.os.Bundle
+import android.support.v4.content.LocalBroadcastManager
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
+import com.example.computernet.service.SendService
+import com.example.computernet.service.ServerService
 import java.io.*
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -87,4 +92,28 @@ open class BaseActivity: AppCompatActivity(){
         }
     }
 
+    lateinit var mLocalBroadcastManager: LocalBroadcastManager
+
+    fun send(msgText: String){
+        val intent = Intent(this, SendService::class.java)
+        intent.putExtra(SendService.CONTENT, msgText)
+        intent.putExtra(SendService.IP_ADDRESS, deviceAddress)
+        intent.putExtra(SendService.PORT, sendPort)
+        startService(intent)
+    }
+
+    fun stopServer(){
+        mLocalBroadcastManager.sendBroadcast(Intent(ServerService.STOP_SERVER))
+    }
+
+    fun startServer(port: Int){
+        val intent = Intent(this, ServerService::class.java)
+        intent.putExtra(ServerService.PORT, port)
+        startService(intent)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
+    }
 }

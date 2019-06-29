@@ -1,7 +1,9 @@
 package com.example.computernet
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pManager
@@ -19,6 +21,8 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.Toast
+import com.example.computernet.service.SendService
+import com.example.computernet.service.ServerService
 import java.io.*
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -30,6 +34,9 @@ class ChatActivity : BaseActivity() {
     private val mList = mutableListOf<ChatMsg>()
     private val adapter = ChatAdapter(mList)
     private var recyclerView: RecyclerView? = null
+
+    private val receiver = ChatReceiver()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
@@ -43,14 +50,18 @@ class ChatActivity : BaseActivity() {
 
         editText.setOnEditorActionListener { textView, i, keyEvent ->
             if (i == EditorInfo.IME_ACTION_DONE){
-                editText.text.toString()
-                editText.setText("")
+                if (editText.text.toString() != ""){
+                    editText.setText("")
+                    send(editText.text.toString())
+                }
             }
             false
         }
         sendButton.setOnClickListener {
-            editText.text.toString()
-            editText.setText("")
+            if (editText.text.toString() != ""){
+                editText.setText("")
+                send(editText.text.toString())
+            }
         }
 
         recyclerView!!.layoutManager = LinearLayoutManager(this)
@@ -62,8 +73,23 @@ class ChatActivity : BaseActivity() {
         }
 
         deviceAddress = intent.getStringExtra("deviceAddress")
-        toolbar.title = "聊天窗口 - $deviceAddress(对方未连接)"
+        supportActionBar?.title = "$deviceAddress(未连接)"
 
+        send("#port:${intent.getIntExtra("devicePort", 11679)}#ip:$deviceAddress#status:ready#")
+        Log.e("ChatActivity", "已发送ready通知")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mLocalBroadcastManager.unregisterReceiver(receiver)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(SendService.SEND_FINISH)
+        intentFilter.addAction(ServerService.RECEIVE_MSG)
+        mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -79,18 +105,37 @@ class ChatActivity : BaseActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-
-
     private fun receive(msgText: String){
-        mList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
-        adapter.notifyItemChanged(mList.size - 1)
-        recyclerView!!.scrollToPosition(mList.size - 1)
-
         if (firstChat){
-            serverPort = msgText.toInt()
-            sendPort = serverPort + 96
-            sendPort.toString()
-            firstChat = false
+            val status = Regex("(?<=#status:).*?(?=#)").find(msgText)?.value ?: "not"
+            if (status == "ready"){
+                Log.e("ChatActivity", "收到更换serverPort通知")
+                serverPort = Regex("(?<=#port:).*?(?=#)").find(msgText)?.value?.toInt() ?: 11791
+                stopServer()
+                send("#port:$serverPort#ip:$deviceAddress#status:confirm")
+                startServer(serverPort)
+                Log.e("ChatActivity", "已更换serverPort")
+                supportActionBar?.title = "$deviceAddress(已连接)"
+                firstChat = false
+            }else if(status == "confirm"){
+                Log.e("ChatActivity", "收到更换sendPort通知")
+                sendPort = Regex("(?<=#port:).*?(?=#)").find(msgText)?.value?.toInt() ?: 11791
+                Log.e("ChatActivity", "已更换sendPort")
+                supportActionBar?.title = "$deviceAddress(已连接)"
+                firstChat = false
+            }
+        }else {
+            mList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
+            adapter.notifyItemChanged(mList.size - 1)
+            recyclerView!!.scrollToPosition(mList.size - 1)
+        }
+    }
+
+    private fun refreshSendMsg(msgText: String){
+        if (!firstChat){
+            mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
+            adapter.notifyItemChanged(mList.size - 1)
+            recyclerView!!.scrollToPosition(mList.size - 1)
         }
     }
 
@@ -102,6 +147,15 @@ class ChatActivity : BaseActivity() {
         val intent = Intent(this, MainActivity::class.java)
         startActivity(intent)
         finish()
+    }
+
+    inner class ChatReceiver: BroadcastReceiver(){
+        override fun onReceive(p0: Context?, intent: Intent?) {
+            when (intent?.action){
+                ServerService.RECEIVE_MSG -> receive(intent.getStringExtra("msg"))
+                SendService.SEND_FINISH -> refreshSendMsg(intent.getStringExtra("msg"))
+            }
+        }
     }
 
     companion object {
