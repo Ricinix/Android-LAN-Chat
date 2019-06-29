@@ -3,6 +3,7 @@ package com.example.computernet
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.DhcpInfo
 import android.net.wifi.WifiInfo
@@ -17,6 +18,7 @@ import android.support.v4.widget.DrawerLayout
 import android.support.design.widget.NavigationView
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
+import android.support.v4.content.LocalBroadcastManager
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.Toolbar
@@ -35,6 +37,10 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private val adapter = MsgAdapter(mList, this)
     private var msgRecyclerView: RecyclerView? = null
     private val context = this
+    private val receiver: ServiceBroadcastReceiver = ServiceBroadcastReceiver()
+    private lateinit var mLocalBroadcastManager: LocalBroadcastManager
+    private lateinit var wifiManager: WifiManager
+    private lateinit var dhcpInfo: DhcpInfo
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,15 +70,31 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         msgRecyclerView!!.layoutManager = LinearLayoutManager(this)
         msgRecyclerView!!.adapter = adapter
 
-        val wifiManager = getSystemService(Context.WIFI_SERVICE) as WifiManager
-        val dhcpInfo:DhcpInfo = wifiManager.dhcpInfo
+        wifiManager = getSystemService(Context.WIFI_SERVICE) as WifiManager
+        dhcpInfo = wifiManager.dhcpInfo
         localIp = intToIp(dhcpInfo.ipAddress)
-        deviceAddress = getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)
         Log.e("MainActivity", "ip地址：${intToIp(dhcpInfo.ipAddress)}")
         Log.e("MainActivity", "子网掩码：${intToIp(dhcpInfo.netmask)}")
         Log.e("MainActivity", "广播号：${getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)}")
+        Log.e("MainActivity", "网关：${intToIp(dhcpInfo.gateway)}")
 
         send("#port:11691#ip:$localIp")
+        startServer(serverPort, localIp)
+        mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mLocalBroadcastManager.unregisterReceiver(receiver)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        deviceAddress = getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(ServerService.RECEIVE_MSG)
+        intentFilter.addAction(SendService.SEND_FINISH)
+        mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
     }
 
     private fun refreshDeviceList(device: DeviceInfo){
@@ -90,13 +112,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private fun startServer(port: Int, localIp: String){
         val intent = Intent(this, ServerService::class.java)
-        intent.putExtra(ServerService.IP_ADDRESS, localIp)
         intent.putExtra(ServerService.PORT, port)
         startService(intent)
     }
 
     private fun searchIp(){
-        stopService(Intent(this, ServerService::class.java))
+//        stopService(Intent(this, ServerService::class.java))
+//        Log.e("MainActivity", "已暂停server")
         send("#port:11691#ip:$localIp")
     }
 
@@ -199,15 +221,20 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     inner class ServiceBroadcastReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
-                SendService.SEND_FINISH -> startServer(serverPort, localIp)
+                SendService.SEND_FINISH -> {
+                    Log.e("MainActivity", "收到成功发送的广播")
+//                    startServer(serverPort, localIp)
+                }
                 ServerService.RECEIVE_MSG -> {
+                    Log.e("MainActivity", "收到接收发送的广播")
                     val msg: String = intent.getStringExtra("msg")
-                    val address: String? = Regex("#ip:.*?").find(msg)?.value
-                    val port: Int? = Regex("#port:.*?").find(msg)?.value?.toInt()
-                    refreshDeviceList(DeviceInfo(address!!, port!!))
+//                    val address: String? = Regex("#ip:.*?").find(msg)?.value
+//                    val port: Int? = Regex("#port:.*?").find(msg)?.value?.toInt()
+                    Log.e("MainActivity", "收到信息为：$msg")
+//                    refreshDeviceList(DeviceInfo(address!!, port!!))
+                    refreshDeviceList(DeviceInfo(msg, 123))
                 }
             }
         }
-
     }
 }

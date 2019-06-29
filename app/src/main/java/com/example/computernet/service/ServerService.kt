@@ -6,7 +6,6 @@ import android.support.v4.content.LocalBroadcastManager
 import android.util.Log
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.InetAddress
 
 
 class ServerService : IntentService("ServerService") {
@@ -20,20 +19,19 @@ class ServerService : IntentService("ServerService") {
 
     override fun onHandleIntent(intent: Intent?) {
 
-        val ipAddress: String? = intent?.getStringExtra(IP_ADDRESS)
         val port: Int? = intent?.getIntExtra(PORT, 11791)
         //包装IP地址
-        val address = InetAddress.getByName(ipAddress)
-        //创建服务端的DatagramSocket对象，需要传入地址和端口号
-        val service = DatagramSocket(port!!, address)
+        //创建服务端的DatagramSocket对象，需要传入端口号
+        val service = DatagramSocket(port!!)
+
 
         var receiveMsg: String = ""
         try {
-
             val receiveBytes = ByteArray(2048)
             //创建接受信息的包对象
             val receivePacket = DatagramPacket(receiveBytes, receiveBytes.size)
 
+            Log.e("ServerService", "成功启动server")
             //开启一个死循环，不断接受数据
             while (true) {
                 try {
@@ -42,7 +40,7 @@ class ServerService : IntentService("ServerService") {
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-
+                Log.e("ServerService", "成功接收信息")
                 //解析收到的数据
                 receiveMsg = String(receivePacket.data, 0, receivePacket.length)
                 //解析客户端地址
@@ -63,6 +61,7 @@ class ServerService : IntentService("ServerService") {
 //                } catch (e: Exception) {
 //                    e.printStackTrace()
 //                }
+                receiveMsg(receiveMsg)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -70,7 +69,6 @@ class ServerService : IntentService("ServerService") {
             //关闭DatagramSocket对象
             service.close()
         }
-        receiveMsg(receiveMsg)
     }
 
     private fun receiveMsg(receiveMsg: String){
