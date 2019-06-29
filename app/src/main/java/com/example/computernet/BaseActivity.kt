@@ -1,6 +1,9 @@
 package com.example.computernet
 
+import android.content.Context
 import android.content.Intent
+import android.net.DhcpInfo
+import android.net.wifi.WifiManager
 import android.os.AsyncTask
 import android.os.Bundle
 import android.support.v4.content.LocalBroadcastManager
@@ -91,6 +94,9 @@ open class BaseActivity: AppCompatActivity(){
 
         }
     }
+    var localIp: String = ""
+    lateinit var dhcpInfo: DhcpInfo
+    private lateinit var wifiManager: WifiManager
 
     lateinit var mLocalBroadcastManager: LocalBroadcastManager
 
@@ -106,14 +112,23 @@ open class BaseActivity: AppCompatActivity(){
         mLocalBroadcastManager.sendBroadcast(Intent(ServerService.STOP_SERVER))
     }
 
-    fun startServer(port: Int){
+    fun startServer(port: Int, localHost: String){
         val intent = Intent(this, ServerService::class.java)
         intent.putExtra(ServerService.PORT, port)
+        intent.putExtra(ServerService.LOCAL_HOST, localHost)
         startService(intent)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
+        wifiManager = getSystemService(Context.WIFI_SERVICE) as WifiManager
+        dhcpInfo = wifiManager.dhcpInfo
+        localIp = intToIp(dhcpInfo.ipAddress)
+    }
+
+    fun intToIp(paramInt: Int): String {
+        return ((paramInt and 0xFF).toString() + "." + (0xFF and (paramInt shr 8)) + "." + (0xFF and (paramInt shr 16)) + "."
+                + (0xFF and (paramInt shr 24)))
     }
 }

@@ -30,7 +30,7 @@ import java.net.Socket
 
 class ChatActivity : BaseActivity() {
 
-    private var firstChat: Boolean = true
+    private var connected = false
     private val mList = mutableListOf<ChatMsg>()
     private val adapter = ChatAdapter(mList)
     private var recyclerView: RecyclerView? = null
@@ -38,6 +38,7 @@ class ChatActivity : BaseActivity() {
     private val receiver = ChatReceiver()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        connected = false
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
 
@@ -51,16 +52,16 @@ class ChatActivity : BaseActivity() {
         editText.setOnEditorActionListener { textView, i, keyEvent ->
             if (i == EditorInfo.IME_ACTION_DONE){
                 if (editText.text.toString() != ""){
-                    editText.setText("")
                     send(editText.text.toString())
+                    editText.setText("")
                 }
             }
             false
         }
         sendButton.setOnClickListener {
             if (editText.text.toString() != ""){
-                editText.setText("")
                 send(editText.text.toString())
+                editText.setText("")
             }
         }
 
@@ -72,11 +73,16 @@ class ChatActivity : BaseActivity() {
             adapter.notifyDataSetChanged()
         }
 
+        //设置对应的Ip地址
         deviceAddress = intent.getStringExtra("deviceAddress")
         supportActionBar?.title = "$deviceAddress(未连接)"
 
-        send("#port:${intent.getIntExtra("devicePort", 11679)}#ip:$deviceAddress#status:ready#")
-        Log.e("ChatActivity", "已发送ready通知")
+        send("#broadcast#connect#")
+    }
+
+    override fun onBackPressed() {
+        send("#broadcast#disconnect#")
+        super.onBackPressed()
     }
 
     override fun onPause() {
@@ -106,23 +112,14 @@ class ChatActivity : BaseActivity() {
     }
 
     private fun receive(msgText: String){
-        if (firstChat){
-            val status = Regex("(?<=#status:).*?(?=#)").find(msgText)?.value ?: "not"
-            if (status == "ready"){
-                Log.e("ChatActivity", "收到更换serverPort通知")
-                serverPort = Regex("(?<=#port:).*?(?=#)").find(msgText)?.value?.toInt() ?: 11791
-                stopServer()
-                send("#port:$serverPort#ip:$deviceAddress#status:confirm")
-                startServer(serverPort)
-                Log.e("ChatActivity", "已更换serverPort")
+        if (Regex("#broadcast#").containsMatchIn(msgText)){
+            if (!connected and Regex("#broadcast#connect#").matches(msgText)){
                 supportActionBar?.title = "$deviceAddress(已连接)"
-                firstChat = false
-            }else if(status == "confirm"){
-                Log.e("ChatActivity", "收到更换sendPort通知")
-                sendPort = Regex("(?<=#port:).*?(?=#)").find(msgText)?.value?.toInt() ?: 11791
-                Log.e("ChatActivity", "已更换sendPort")
-                supportActionBar?.title = "$deviceAddress(已连接)"
-                firstChat = false
+                send("#broadcast#connect#")
+                connected = true
+            }else if(connected and Regex("#broadcast#disconnect#").matches(msgText)){
+                supportActionBar?.title = "$deviceAddress(未连接)"
+                connected = false
             }
         }else {
             mList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
@@ -132,7 +129,7 @@ class ChatActivity : BaseActivity() {
     }
 
     private fun refreshSendMsg(msgText: String){
-        if (!firstChat){
+        if (!Regex("#broadcast#").containsMatchIn(msgText)){
             mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
             adapter.notifyItemChanged(mList.size - 1)
             recyclerView!!.scrollToPosition(mList.size - 1)
@@ -144,6 +141,7 @@ class ChatActivity : BaseActivity() {
     }
 
     private fun quit(){
+        send("#broadcast#disconnect#")
         val intent = Intent(this, MainActivity::class.java)
         startActivity(intent)
         finish()

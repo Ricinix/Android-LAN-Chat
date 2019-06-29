@@ -16,6 +16,7 @@ class ServerService : IntentService("ServerService") {
         const val RECEIVE_MSG: String = "receive_msg"
         const val PORT: String = "port"
         const val STOP_SERVER: String = "stop_server"
+        const val LOCAL_HOST: String = "local_host"
     }
 
     private val mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
@@ -23,12 +24,15 @@ class ServerService : IntentService("ServerService") {
     private var running: Boolean = true
 
     override fun onHandleIntent(intent: Intent?) {
+        running = true
 
         val intentFilter = IntentFilter()
         intentFilter.addAction(STOP_SERVER)
         val receiver = ServerReceiver()
         mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
         val port: Int? = intent?.getIntExtra(PORT, 11791)
+        var localIp: String? = intent?.getStringExtra(LOCAL_HOST)
+        localIp = "/$localIp"
         //包装IP地址
         //创建服务端的DatagramSocket对象，需要传入端口号
         service = DatagramSocket(port!!)
@@ -50,6 +54,9 @@ class ServerService : IntentService("ServerService") {
                 }
                 Log.e("ServerService", "成功接收信息")
                 //解析收到的数据
+                Log.e("ServerService", "该数据包来自:${receivePacket.address}")
+                if (receivePacket.address.toString() == localIp)
+                    continue
                 receiveMsg = String(receivePacket.data, 0, receivePacket.length)
                 //解析客户端地址
 //                val clientAddress = receivePacket.address

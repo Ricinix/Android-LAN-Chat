@@ -29,14 +29,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     companion object{
         var debugMode = 0
     }
-    private var localIp: String = ""
     private val mList = mutableListOf<DeviceInfo>()
     private val adapter = MsgAdapter(mList, this)
     private var msgRecyclerView: RecyclerView? = null
     private val context = this
     private val receiver: ServiceBroadcastReceiver = ServiceBroadcastReceiver()
-    private lateinit var wifiManager: WifiManager
-    private lateinit var dhcpInfo: DhcpInfo
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,7 +49,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         //设置悬浮按钮，点击则搜索
         fab.setOnClickListener { view ->
-            send("#port:11691#ip:$localIp#")
+            send("#broadcast#port:11691#ip:$localIp#")
             Snackbar.make(view, "已成功告诉别人我在哪", Snackbar.LENGTH_LONG).setAction("action", null).show()
         }
         val toggle = ActionBarDrawerToggle(
@@ -66,16 +63,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         msgRecyclerView!!.layoutManager = LinearLayoutManager(this)
         msgRecyclerView!!.adapter = adapter
 
-        wifiManager = getSystemService(Context.WIFI_SERVICE) as WifiManager
-        dhcpInfo = wifiManager.dhcpInfo
-        localIp = intToIp(dhcpInfo.ipAddress)
         Log.e("MainActivity", "ip地址：${intToIp(dhcpInfo.ipAddress)}")
         Log.e("MainActivity", "子网掩码：${intToIp(dhcpInfo.netmask)}")
         Log.e("MainActivity", "广播号：${getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)}")
         Log.e("MainActivity", "网关：${intToIp(dhcpInfo.gateway)}")
 
-        send("#port:11691#ip:$localIp#")
-        startServer(serverPort)
+        send("#broadcast#port:11691#ip:$localIp#")
+        startServer(serverPort, localIp)
     }
 
     private fun refreshDeviceList(device: DeviceInfo){
@@ -91,11 +85,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             adapter.notifyItemChanged(mList.size - 1)
             msgRecyclerView!!.scrollToPosition(mList.size - 1)
         }
-    }
-
-    private fun intToIp(paramInt: Int): String {
-        return ((paramInt and 0xFF).toString() + "." + (0xFF and (paramInt shr 8)) + "." + (0xFF and (paramInt shr 16)) + "."
-                + (0xFF and (paramInt shr 24)))
     }
 
     private fun getBroadcastIp(ip: Int, netMask: Int): String{
@@ -145,6 +134,12 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         return when (item.itemId) {
             R.id.action_quit -> {
                 finish()
+                return true
+            }
+            R.id.action_clear -> {
+                mList.clear()
+                adapter.notifyDataSetChanged()
+                msgRecyclerView!!.scrollToPosition(0)
                 return true
             }
             else -> super.onOptionsItemSelected(item)
