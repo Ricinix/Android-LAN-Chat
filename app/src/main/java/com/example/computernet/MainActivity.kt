@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.DhcpInfo
-import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.support.design.widget.FloatingActionButton
@@ -26,7 +25,6 @@ import android.util.Log
 import android.view.Menu
 import com.example.computernet.service.SendService
 import com.example.computernet.service.ServerService
-import java.net.InetAddress
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     companion object{
@@ -56,8 +54,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         //设置悬浮按钮，点击则搜索
         fab.setOnClickListener { view ->
-            searchIp()
-            Snackbar.make(view, "成功告诉别人我在哪", Snackbar.LENGTH_LONG).setAction("action", null).show()
+            send("#port:11691#ip:$localIp#")
+            Snackbar.make(view, "已成功告诉别人我在哪", Snackbar.LENGTH_LONG).setAction("action", null).show()
         }
         val toggle = ActionBarDrawerToggle(
             this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close
@@ -78,23 +76,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         Log.e("MainActivity", "广播号：${getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)}")
         Log.e("MainActivity", "网关：${intToIp(dhcpInfo.gateway)}")
 
-        send("#port:11691#ip:$localIp")
+        send("#port:11691#ip:$localIp#")
         startServer(serverPort, localIp)
         mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        mLocalBroadcastManager.unregisterReceiver(receiver)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        deviceAddress = getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)
-        val intentFilter = IntentFilter()
-        intentFilter.addAction(ServerService.RECEIVE_MSG)
-        intentFilter.addAction(SendService.SEND_FINISH)
-        mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
     }
 
     private fun refreshDeviceList(device: DeviceInfo){
@@ -103,6 +87,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             if (device.address == de.address)
                 has = true
         }
+        if (device.address == localIp)
+            has = true
         if (!has){
             mList.add(device)
             adapter.notifyItemChanged(mList.size - 1)
@@ -110,16 +96,14 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
     }
 
+    private fun stopServer(){
+        mLocalBroadcastManager.sendBroadcast(Intent(ServerService.STOP_SERVER))
+    }
+
     private fun startServer(port: Int, localIp: String){
         val intent = Intent(this, ServerService::class.java)
         intent.putExtra(ServerService.PORT, port)
         startService(intent)
-    }
-
-    private fun searchIp(){
-//        stopService(Intent(this, ServerService::class.java))
-//        Log.e("MainActivity", "已暂停server")
-        send("#port:11691#ip:$localIp")
     }
 
     private fun send(msgText: String){
@@ -139,6 +123,25 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         var net: Int = ip and netMask
         net = net or netMask.inv()
         return intToIp(net)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopServer()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mLocalBroadcastManager.unregisterReceiver(receiver)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        deviceAddress = getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(ServerService.RECEIVE_MSG)
+        intentFilter.addAction(SendService.SEND_FINISH)
+        mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
     }
 
     override fun onBackPressed() {
@@ -174,6 +177,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         when (item.itemId) {
             R.id.nav_home -> {
                 // Handle the camera action
+                stopServer()
             }
             R.id.nav_gallery -> {
 
@@ -221,18 +225,14 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     inner class ServiceBroadcastReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
-                SendService.SEND_FINISH -> {
-                    Log.e("MainActivity", "收到成功发送的广播")
-//                    startServer(serverPort, localIp)
-                }
                 ServerService.RECEIVE_MSG -> {
                     Log.e("MainActivity", "收到接收发送的广播")
                     val msg: String = intent.getStringExtra("msg")
-//                    val address: String? = Regex("#ip:.*?").find(msg)?.value
-//                    val port: Int? = Regex("#port:.*?").find(msg)?.value?.toInt()
+                    val address: String? = Regex("(?<=#ip:).*?(?=#)").find(msg)?.value
+                    val port: Int? = Regex("(?<=#port:).*?(?=#)").find(msg)?.value?.toInt()
                     Log.e("MainActivity", "收到信息为：$msg")
 //                    refreshDeviceList(DeviceInfo(address!!, port!!))
-                    refreshDeviceList(DeviceInfo(msg, 123))
+                    refreshDeviceList(DeviceInfo(address?:localIp, port?: sendPort))
                 }
             }
         }

@@ -1,7 +1,10 @@
 package com.example.computernet.service
 
 import android.app.IntentService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.support.v4.content.LocalBroadcastManager
 import android.util.Log
 import java.net.DatagramPacket
@@ -11,21 +14,26 @@ import java.net.DatagramSocket
 class ServerService : IntentService("ServerService") {
     companion object{
         const val RECEIVE_MSG: String = "receive_msg"
-        const val IP_ADDRESS: String = "ip_address"
         const val PORT: String = "port"
+        const val STOP_SERVER: String = "stop_server"
     }
 
     private val mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
+    private lateinit var service: DatagramSocket
+    private var running: Boolean = true
 
     override fun onHandleIntent(intent: Intent?) {
 
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(STOP_SERVER)
+        val receiver = ServerReceiver()
+        mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
         val port: Int? = intent?.getIntExtra(PORT, 11791)
         //包装IP地址
         //创建服务端的DatagramSocket对象，需要传入端口号
-        val service = DatagramSocket(port!!)
+        service = DatagramSocket(port!!)
 
-
-        var receiveMsg: String = ""
+        var receiveMsg: String
         try {
             val receiveBytes = ByteArray(2048)
             //创建接受信息的包对象
@@ -33,7 +41,7 @@ class ServerService : IntentService("ServerService") {
 
             Log.e("ServerService", "成功启动server")
             //开启一个死循环，不断接受数据
-            while (true) {
+            while (running) {
                 try {
                     //接收数据，程序会阻塞到这一步，直到收到一个数据包为止
                     service.receive(receivePacket)
@@ -44,7 +52,7 @@ class ServerService : IntentService("ServerService") {
                 //解析收到的数据
                 receiveMsg = String(receivePacket.data, 0, receivePacket.length)
                 //解析客户端地址
-                val clientAddress = receivePacket.address
+//                val clientAddress = receivePacket.address
 
 //                //解析客户端端口
 //                val clientPort = receivePacket.port
@@ -69,6 +77,8 @@ class ServerService : IntentService("ServerService") {
             //关闭DatagramSocket对象
             service.close()
         }
+        mLocalBroadcastManager.unregisterReceiver(receiver)
+        Log.e("ServerService", "server关闭")
     }
 
     private fun receiveMsg(receiveMsg: String){
@@ -78,4 +88,15 @@ class ServerService : IntentService("ServerService") {
         mLocalBroadcastManager.sendBroadcast(intent)
     }
 
+    inner class ServerReceiver: BroadcastReceiver(){
+        override fun onReceive(p0: Context?, intent: Intent?) {
+            when (intent?.action){
+                STOP_SERVER -> {
+                    service.close()
+                    running = false
+                }
+            }
+        }
+
+    }
 }

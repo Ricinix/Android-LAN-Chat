@@ -62,7 +62,7 @@ class ChatActivity : BaseActivity() {
         }
 
         deviceAddress = intent.getStringExtra("deviceAddress")
-        toolbar.title = "聊天窗口 - ${intent.getStringExtra("deviceAddress")}"
+        toolbar.title = "聊天窗口 - $deviceAddress(对方未连接)"
 
     }
 
