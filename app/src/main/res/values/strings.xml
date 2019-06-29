@@ -12,8 +12,10 @@
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">退出</string>
     <string name="action_clear">清空</string>
+    <string name="wrong_remind">发送失败</string>
+    <string name="phone_icon">设备</string>
 
-    <string name="menu_home">Home</string>
+    <string name="menu_home">Server Shutdown</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
     <string name="menu_tools">Debug Mode</string>

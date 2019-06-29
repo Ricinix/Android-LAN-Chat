@@ -12,8 +12,10 @@ class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Conte
 
     inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v){
         var textView: TextView? = null
+        var msgNum: TextView? = null
         init {
             textView = v.findViewById(R.id.usr)
+            msgNum = v.findViewById(R.id.msg_num)
         }
     }
 
@@ -23,7 +25,7 @@ class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Conte
         val holder = ViewHolder(cardView)
         cardView.setOnClickListener{
             val device = mList[holder.adapterPosition]
-            ChatActivity.startThisActivity(context, device.address, device.port)
+            ChatActivity.startThisActivity(context, device.address)
         }
         return holder
     }
@@ -31,7 +33,17 @@ class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Conte
     override fun getItemCount(): Int =mList.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.textView!!.text = mList[position].address
+        if (mList[position].name != "default"){
+            holder.textView!!.text = mList[position].name
+        }else {
+            holder.textView!!.text = mList[position].address
+        }
+        if (mList[position].new == 0){
+            holder.msgNum!!.visibility = View.GONE
+        }else {
+            holder.msgNum!!.visibility = View.VISIBLE
+            holder.msgNum!!.text = mList[position].new.toString()
+        }
     }
 
 }

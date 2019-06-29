@@ -24,6 +24,8 @@ open class BaseActivity: AppCompatActivity(){
         var serverPort: Int = 11791
         var sendPort: Int = 11791
         var deviceAddress: String = "255"
+        var deviceName: String = "default"
+        val deviceList = mutableListOf<DeviceInfo>()
 
         class ServerAsyncTask: AsyncTask<Unit, Unit, Unit>() {
             private var msgText:String = ""
@@ -131,4 +133,6 @@ open class BaseActivity: AppCompatActivity(){
         return ((paramInt and 0xFF).toString() + "." + (0xFF and (paramInt shr 8)) + "." + (0xFF and (paramInt shr 16)) + "."
                 + (0xFF and (paramInt shr 24)))
     }
+
+
 }

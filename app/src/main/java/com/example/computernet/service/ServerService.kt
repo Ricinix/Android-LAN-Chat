@@ -17,6 +17,7 @@ class ServerService : IntentService("ServerService") {
         const val PORT: String = "port"
         const val STOP_SERVER: String = "stop_server"
         const val LOCAL_HOST: String = "local_host"
+        const val FROM_ADDRESS: String = "from_address"
     }
 
     private val mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
@@ -37,6 +38,7 @@ class ServerService : IntentService("ServerService") {
         //创建服务端的DatagramSocket对象，需要传入端口号
         service = DatagramSocket(port!!)
 
+        var receiveAddress: String
         var receiveMsg: String
         try {
             val receiveBytes = ByteArray(2048)
@@ -54,7 +56,9 @@ class ServerService : IntentService("ServerService") {
                 }
                 Log.e("ServerService", "成功接收信息")
                 //解析收到的数据
-                Log.e("ServerService", "该数据包来自:${receivePacket.address}")
+                receiveAddress = receivePacket.address.toString()
+                receiveAddress = receiveAddress.substring(1, receiveAddress.length)
+                Log.e("ServerService", "该数据包来自:$receiveAddress")
                 if (receivePacket.address.toString() == localIp)
                     continue
                 receiveMsg = String(receivePacket.data, 0, receivePacket.length)
@@ -76,7 +80,7 @@ class ServerService : IntentService("ServerService") {
 //                } catch (e: Exception) {
 //                    e.printStackTrace()
 //                }
-                receiveMsg(receiveMsg)
+                receiveMsg(receiveMsg, receiveAddress)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -88,10 +92,11 @@ class ServerService : IntentService("ServerService") {
         Log.e("ServerService", "server关闭")
     }
 
-    private fun receiveMsg(receiveMsg: String){
+    private fun receiveMsg(receiveMsg: String, address: String){
         Log.e("ServerService", "收到信息：$receiveMsg")
         val intent = Intent(RECEIVE_MSG)
         intent.putExtra("msg", receiveMsg)
+        intent.putExtra(FROM_ADDRESS, address)
         mLocalBroadcastManager.sendBroadcast(intent)
     }
 
