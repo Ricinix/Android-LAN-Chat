@@ -23,6 +23,7 @@ open class BaseActivity: AppCompatActivity(){
         private val TAG = "BaseActivity"
         var serverPort: Int = 11791
         var sendPort: Int = 11791
+        val TcpPort: Int = 11697
         var deviceAddress: String = "255"
         var deviceName: String = "default"
         val deviceList = mutableListOf<DeviceInfo>()

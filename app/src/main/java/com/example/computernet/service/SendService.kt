@@ -57,7 +57,7 @@ class SendService : IntentService("SendService") {
     }
 
     private fun sendFinish(){
-        Log.e("SendService", "成功发送消息")
+        Log.e("SendService", "成功UDP发送消息")
         val intent = Intent(SEND_FINISH)
         intent.putExtra("msg", msg)
         mLocalBroadcastManager.sendBroadcast(intent)

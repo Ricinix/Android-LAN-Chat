@@ -25,7 +25,7 @@ class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Conte
         val holder = ViewHolder(cardView)
         cardView.setOnClickListener{
             val device = mList[holder.adapterPosition]
-            ChatActivity.startThisActivity(context, device.address)
+            ChatActivity.startThisActivity(context, device.address, false, "")
         }
         return holder
     }

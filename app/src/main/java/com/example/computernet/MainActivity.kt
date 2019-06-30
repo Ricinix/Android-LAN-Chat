@@ -24,6 +24,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import com.example.computernet.service.SendService
 import com.example.computernet.service.ServerService
+import java.util.jar.Manifest
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     companion object{
@@ -48,6 +49,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         msgRecyclerView = findViewById(R.id.msg_recycler_view)
         //设置toolbar
         setSupportActionBar(toolbar)
+
+        requestPermission(listOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            android.Manifest.permission.READ_EXTERNAL_STORAGE))
 
         renameButton.setOnClickListener { view ->
             val et = EditText(this)
@@ -247,10 +251,33 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                         }
                         else if (Regex("#disconnect#").containsMatchIn(msg)){
                             removeDevice(address)
+                        }else if(Regex("#file#").containsMatchIn(msg)){
+                            for (de in deviceList){
+                                if (de.address == address){
+                                    if (de.name != "default"){
+                                        AlertDialog.Builder(this@MainActivity).setTitle("${de.name}想向你发送文件")
+                                            .setIcon(android.R.drawable.sym_def_app_icon)
+                                            .setPositiveButton("确定接收") { p0, p1 ->
+                                                ChatActivity.startThisActivity(
+                                                    this@MainActivity, address, true, msg)
+                                            }.setNegativeButton("拒绝接收"){ p0, p1 ->
+                                                send("#broadcast#file#refuse#")
+                                            }.show()
+                                    }else{
+                                        AlertDialog.Builder(this@MainActivity).setTitle("${de.address}想向你发送文件")
+                                            .setIcon(android.R.drawable.sym_def_app_icon)
+                                            .setPositiveButton("确定接收") { p0, p1 ->
+                                                ChatActivity.startThisActivity(
+                                                    this@MainActivity, address, true, msg)
+                                            }.setNegativeButton("拒绝接收"){ p0, p1 ->
+                                                send("#broadcast#file#refuse#")
+                                            }.show()
+                                    }
+                                }
+                            }
                         }
                     }else {
                         Log.e("MainActivity", "收到聊天信息")
-                        val address: String = intent.getStringExtra(ServerService.FROM_ADDRESS)
                         for (de in deviceList){
                             if (de.address == address){
                                 de.chatList.add(ChatMsg(msg, ChatMsg.TYPE_RECEIVED))
