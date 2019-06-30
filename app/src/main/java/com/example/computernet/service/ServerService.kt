@@ -59,27 +59,11 @@ class ServerService : IntentService("ServerService") {
                 receiveAddress = receivePacket.address.toString()
                 receiveAddress = receiveAddress.substring(1, receiveAddress.length)
                 Log.e("ServerService", "该数据包来自:$receiveAddress")
+                //跳过自己发送的数据
                 if (receivePacket.address.toString() == localIp)
                     continue
                 receiveMsg = String(receivePacket.data, 0, receivePacket.length)
-                //解析客户端地址
-//                val clientAddress = receivePacket.address
 
-//                //解析客户端端口
-//                val clientPort = receivePacket.port
-
-//                //组建响应信息
-//                val response = "Hello world " + System.currentTimeMillis() + " " + receiveMsg
-//                val responseBuf = response.toByteArray()
-//                //创建响应信息的包对象，由于要发送到目的地址，所以要加上目的主机的地址和端口号
-//                val responsePacket = DatagramPacket(responseBuf, responseBuf.size, clientAddress, clientPort)
-//
-//                try {
-//                    //发送数据
-//                    service.send(responsePacket)
-//                } catch (e: Exception) {
-//                    e.printStackTrace()
-//                }
                 receiveMsg(receiveMsg, receiveAddress)
             }
         } catch (e: Exception) {
@@ -92,6 +76,7 @@ class ServerService : IntentService("ServerService") {
         Log.e("ServerService", "server关闭")
     }
 
+    //处理接收的信息
     private fun receiveMsg(receiveMsg: String, address: String){
         Log.e("ServerService", "收到信息：$receiveMsg")
         val intent = Intent(RECEIVE_MSG)
@@ -100,6 +85,7 @@ class ServerService : IntentService("ServerService") {
         mLocalBroadcastManager.sendBroadcast(intent)
     }
 
+    //广播接收器用于结束该服务
     inner class ServerReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){

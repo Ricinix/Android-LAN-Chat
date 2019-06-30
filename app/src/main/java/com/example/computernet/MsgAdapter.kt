@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 
+//这是recyclerView适配器的类，在这里设置了点击事件，当用户点击某个设备图标时，从这里开启下一个活动
 class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Context): RecyclerView.Adapter<MsgAdapter.ViewHolder>() {
 
     inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v){
@@ -33,11 +34,13 @@ class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Conte
     override fun getItemCount(): Int =mList.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        //显示设备名，若未设置则显示设备IP地址
         if (mList[position].name != "default"){
             holder.textView!!.text = mList[position].name
         }else {
             holder.textView!!.text = mList[position].address
         }
+        //设置未读消息数目的显示
         if (mList[position].new == 0){
             holder.msgNum!!.visibility = View.GONE
         }else {

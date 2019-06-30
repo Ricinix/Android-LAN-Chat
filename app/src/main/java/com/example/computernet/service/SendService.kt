@@ -29,8 +29,10 @@ class SendService : IntentService("SendService") {
         val port: Int? = intent?.getIntExtra(PORT, 11791)
         val client = DatagramSocket()
         try {
+            //将字符串转换成Byte数组
             val sendBytes: ByteArray? = msg?.toByteArray()
             val address: InetAddress = InetAddress.getByName(ipAddress)
+            //打包发送
             val sendPacket = DatagramPacket(sendBytes, sendBytes!!.size, address, port!!)
 
             try {
@@ -38,16 +40,6 @@ class SendService : IntentService("SendService") {
             }catch (e: Exception){
                 e.printStackTrace()
             }
-
-//            val responseBytes = ByteArray(2048)
-//            val responsePacket= DatagramPacket(responseBytes,responseBytes.size)
-//
-//            try {
-//                client.receive(responsePacket)
-//            }catch (e: Exception){
-//                e.printStackTrace()
-//            }
-//            responseMsg = String(responsePacket.data,0,responsePacket.length)
         }catch (e: Exception){
             e.printStackTrace()
         }finally {

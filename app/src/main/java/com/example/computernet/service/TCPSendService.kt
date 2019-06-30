@@ -47,20 +47,16 @@ class TCPSendService : IntentService("TCPSendService") {
             val inputStream: InputStream? = cr.openInputStream(Uri.parse(url))
 //            val fileInputStream = FileInputStream(File(url))
             var len = 0
+            //窗口值大小
             val buffer = ByteArray(10240)
             var total: Long = 0
 
+            //发送数据
             while (inputStream!!.read(buffer).also { len = it } != -1 ){
                 out.write(buffer, 0, len)
                 total += len
                 updateProgress(total, length)
             }
-//            len = fileInputStream.read(buffer)
-//            while (len != -1){
-//                out.write(buffer, 0, len)
-//                total += len
-//                updateProgress(total, )
-//            }
             out.close()
             inputStream.close()
             client.takeIf { it.isConnected }?.close()
@@ -71,12 +67,14 @@ class TCPSendService : IntentService("TCPSendService") {
         }
     }
 
+    //发送成功的通知
     private fun sendFinish(){
         Log.e("TCPSendService", "成功发送文件")
         val intent = Intent(SEND_FINISH)
         mLocalBroadcastManager.sendBroadcast(intent)
     }
 
+    //更新进度条
     private fun updateProgress(now: Long, length: Long){
         Log.e("TcpSendService", "正在更新进度条：$now / $length")
         val intent = Intent(PROGRESS_UPDATE)
@@ -85,6 +83,7 @@ class TCPSendService : IntentService("TCPSendService") {
         mLocalBroadcastManager.sendBroadcast(intent)
     }
 
+    //异步关闭服务
     inner class TcpSendReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){

@@ -34,9 +34,11 @@ class TCPServerService : IntentService("TCPServerService") {
         val fileSize: Long = intent?.getLongExtra(LENGTH_PROGRESS, 100) ?: 100
         try {
             val serverSocket = ServerSocket(port)
+            //连接socket
             val connect: Socket = serverSocket.accept()
             Log.e("TcpServerService", "已成功启动TcpServer")
             Log.e("TcpServerService", "路径为$path")
+            //打开文件
             val f = File(path)
             val dirs = File(f.parent)
             Log.e("TcpServerService", "正在接收的文件名为${f.name}")
@@ -44,11 +46,13 @@ class TCPServerService : IntentService("TCPServerService") {
                 dirs.mkdirs()
                 Log.e("TcpServerService", "创建Download目录")
             }
+            //创建文件
             if (f.createNewFile())
                 Log.e("TcpServerService", "成功创建文件 $path")
             else
                 Log.e("TcpServerService", "已存在")
 
+            //获取输入流
             val inStream: InputStream = connect.getInputStream()
             val fileOutputStream  = FileOutputStream(f)
             val buffer = ByteArray(10240)
@@ -70,6 +74,7 @@ class TCPServerService : IntentService("TCPServerService") {
         }
     }
 
+    //更新进度条
     private fun updateProgress(now: Long, size: Long){
         Log.e("TcpSendService", "正在更新进度条：$now / $size")
         val intent = Intent(PROGRESS_UPDATE)
@@ -78,6 +83,7 @@ class TCPServerService : IntentService("TCPServerService") {
         mLocalBroadcastManager.sendBroadcast(intent)
     }
 
+    //接收成功的通知
     private fun receiveFinish(){
         Log.e("TcpServerService", "成功接收文件")
         val intent = Intent(RECEIVE_FINISH)

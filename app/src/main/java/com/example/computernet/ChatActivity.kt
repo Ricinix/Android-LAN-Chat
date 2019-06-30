@@ -49,6 +49,7 @@ class ChatActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
 
+        //加载组件
         val sendButton: AppCompatButton = findViewById(R.id.send_button)
         val toolbar: Toolbar = findViewById(R.id.toolbar_chat)
         val editText: EditText = findViewById(R.id.edit_text)
@@ -56,6 +57,7 @@ class ChatActivity : BaseActivity() {
 
         setSupportActionBar(toolbar)
 
+        //回车发送数据
         editText.setOnEditorActionListener { textView, i, keyEvent ->
             if (i == EditorInfo.IME_ACTION_DONE){
                 if (editText.text.toString() != ""){
@@ -65,6 +67,7 @@ class ChatActivity : BaseActivity() {
             }
             false
         }
+        //点击发送按钮来发送数据
         sendButton.setOnClickListener {
             if (editText.text.toString() != ""){
                 send(editText.text.toString())
@@ -75,6 +78,7 @@ class ChatActivity : BaseActivity() {
         recyclerView!!.layoutManager = LinearLayoutManager(this)
         //设置对应的Ip地址
         deviceAddress = intent.getStringExtra("deviceAddress")
+        //根据设备IP来获取对应的聊天记录
         getList(deviceAddress)
         adapter = ChatAdapter(mList)
         recyclerView!!.adapter = adapter
@@ -84,9 +88,11 @@ class ChatActivity : BaseActivity() {
             adapter.notifyDataSetChanged()
         }
 
+        //设置标题
         setTitle(false)
         isConnected(deviceAddress)
 
+        //打开活动的时候就要接收文件传输
         if (intent.getBooleanExtra("readyToReceive", false)){
             val msgText: String = intent.getStringExtra("msg")
             val fileSize: Long = Regex("(?<=#size:).*?(?=#)").find(msgText)?.value?.toLong() ?: 0
@@ -96,6 +102,7 @@ class ChatActivity : BaseActivity() {
         }
     }
 
+    //获取要发送文件的路径
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == 1){
             val uri: Uri? = data?.data
@@ -110,11 +117,13 @@ class ChatActivity : BaseActivity() {
         }
     }
 
+    //活动不可见时注销广播接收器
     override fun onPause() {
         super.onPause()
         mLocalBroadcastManager.unregisterReceiver(receiver)
     }
 
+    //注册广播接收器
     override fun onResume() {
         super.onResume()
         adapter.notifyDataSetChanged()
@@ -128,11 +137,13 @@ class ChatActivity : BaseActivity() {
         mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
     }
 
+    //加载菜单栏
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu_chat, menu)
         return true
     }
 
+    //传输文件的按钮监听
     override fun onOptionsItemSelected(item: MenuItem?): Boolean {
         when(item!!.itemId){
             android.R.id.home -> quit()
@@ -143,6 +154,7 @@ class ChatActivity : BaseActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    //获取对应设备的聊天记录
     private fun getList(address: String){
         for (de in deviceList){
             if (de.address == address){
@@ -152,6 +164,7 @@ class ChatActivity : BaseActivity() {
         }
     }
 
+    //判断对方是否在线
     private fun isConnected(address: String){
         for (de in deviceList){
             if (de.address == address){
@@ -162,9 +175,12 @@ class ChatActivity : BaseActivity() {
         }
     }
 
+    //收到信息时的相应处理
     private fun receive(msgText: String, address: String){
+        //判断是不是特殊消息
         if (Regex("#broadcast#").containsMatchIn(msgText)){
             val name: String? = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value
+            //判断是否有人上线
             if (Regex("#connect#").containsMatchIn(msgText)){
                 var has = false
                 for (de in deviceList){
@@ -182,6 +198,7 @@ class ChatActivity : BaseActivity() {
                     setTitle(true)
                 }
             }else if(connected and Regex("#broadcast#disconnect#").containsMatchIn(msgText)){
+                //判断是否有人离线
                 var i = -1
                 for (de in deviceList){
                     i++
@@ -191,23 +208,28 @@ class ChatActivity : BaseActivity() {
                 }
                 if (i >= 0){
                     deviceList.removeAt(i)
+                    //若是当前聊天的人，则设置为未连接
                     if (address == deviceAddress){
                         connected = false
                         setTitle(false)
                     }
                 }
             }else if(Regex("#broadcast#file#").containsMatchIn(msgText)){
+                //若是文件传输的请求
                 when {
+                    //对方拒绝接收文件
                     Regex("#refuse#").containsMatchIn(msgText) -> {
                         Log.e("ChatActivity", "对方拒绝接收")
                         Toast.makeText(this, "对方拒绝接收", Toast.LENGTH_LONG).show()
                         val intent = Intent(TCPSendService.SEND_SHUTDOWN)
                         mLocalBroadcastManager.sendBroadcast(intent)
                     }
+                    //收到对方的确认
                     Regex("#confirm#").containsMatchIn(msgText) -> {
                         Log.e("ChatActivity", "收到传输请求的确认，开始传输文件")
                         fileTrans()
                     }
+                    //收到传输请求
                     else -> {
                         val fileSize: Long = Regex("(?<=#size:).*?(?=#)").find(msgText)?.value?.toLong() ?: 0
                         val fileName: String = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value ?: "download"
@@ -224,17 +246,22 @@ class ChatActivity : BaseActivity() {
         }
     }
 
+    //接收文件
     private fun receiveFile(size: Long, url: String){
         AlertDialog.Builder(this).setTitle("对方想给你发送一个文件")
                 .setIcon(android.R.drawable.sym_def_app_icon)
                 .setPositiveButton("接收") { p0, p1 ->
+                    //启动TCP服务端的服务
                     startTcpServer(size, url)
+                    //发送确认应答
                     send("#broadcast#file#confirm#")
                 }.setNegativeButton("拒绝") { p0, p1 ->
+                //发送拒绝应答
                 send("#broadcast#file#refuse#")
             }.show()
     }
 
+    //开启TCP服务端服务
     private fun startTcpServer(size: Long, url: String){
         val intent = Intent(this, TCPServerService::class.java)
         intent.putExtra(TCPServerService.PORT, TcpPort)
@@ -243,6 +270,7 @@ class ChatActivity : BaseActivity() {
         startService(intent)
     }
 
+    //设置标题
     private fun setTitle(connect: Boolean){
         if (targetName != "default"){
             if (connect){
@@ -259,8 +287,10 @@ class ChatActivity : BaseActivity() {
         }
     }
 
+    //刷新聊天信息
     private fun refreshSendMsg(msgText: String){
         if (!Regex("#broadcast#").containsMatchIn(msgText)){
+            //如果连接，正常发送
             if (connected){
                 mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
             }
@@ -272,6 +302,7 @@ class ChatActivity : BaseActivity() {
         }
     }
 
+    //选择文件
     private fun chooseFile(){
         val intent = Intent(Intent.ACTION_GET_CONTENT)
         intent.type = "*/*"
@@ -279,6 +310,7 @@ class ChatActivity : BaseActivity() {
         startActivityForResult(intent, 1)
     }
 
+    //启动TCP客户端服务
     private fun fileTrans(){
         val intent = Intent(this, TCPSendService::class.java)
         intent.putExtra(TCPSendService.ADDRESS, deviceAddress)
@@ -289,13 +321,15 @@ class ChatActivity : BaseActivity() {
 
     }
 
+    //退出
     private fun quit(){
         val intent = Intent(this, MainActivity::class.java)
         startActivity(intent)
         finish()
     }
 
-    private fun updateReceiveProgress(now: Long, length: Long){
+    //更新进度条
+    private fun updateProgress(now: Long, length: Long, id: Int){
         val progress: Int = ((now * 100) / length).toInt()
         val notification = NotificationCompat.Builder(this, "Progress")
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -305,35 +339,12 @@ class ChatActivity : BaseActivity() {
             .setProgress(100, progress, false)
             .build()
         notification.flags = Notification.FLAG_ONGOING_EVENT
-        mNotificationManager.notify(1, notification)
+        mNotificationManager.notify(id, notification)
     }
 
-    private fun updateSendProgress(now: Long, length: Long){
-        val progress: Int = ((now * 100) / length).toInt()
-        val notification = NotificationCompat.Builder(this, "Progress")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
-            .setContentTitle("文件传输")
-            .setContentText("$progress%")
-            .setProgress(100, progress, false)
-            .build()
-        notification.flags = Notification.FLAG_ONGOING_EVENT
-        mNotificationManager.notify(2, notification)
-    }
-
-    private fun receiveSucceed(){
-        mNotificationManager.cancel(1)
-        val notification = NotificationCompat.Builder(this, "Progress")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
-            .setContentTitle("传输文件")
-            .setContentText("已完成")
-            .build()
-        mNotificationManager.notify(3, notification)
-    }
-
-    private fun sendSucceed(){
-        mNotificationManager.cancel(2)
+    //成功接收的通知
+    private fun tranSucceed(id: Int){
+        mNotificationManager.cancel(id)
         val notification = NotificationCompat.Builder(this, "Progress")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
@@ -346,17 +357,18 @@ class ChatActivity : BaseActivity() {
     inner class ChatReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
+                //接收广播，发通知
                 ServerService.RECEIVE_MSG -> receive(intent.getStringExtra("msg"),
                     intent.getStringExtra(ServerService.FROM_ADDRESS))
                 SendService.SEND_FINISH -> refreshSendMsg(intent.getStringExtra("msg"))
-                TCPSendService.SEND_FINISH -> sendSucceed()
+                TCPSendService.SEND_FINISH -> tranSucceed(1)
                 TCPSendService.PROGRESS_UPDATE ->
-                    updateSendProgress(intent.getLongExtra(TCPSendService.NOW_PROGRESS, 0),
-                        intent.getLongExtra(TCPSendService.LENGTH_PROGRESS, 0))
-                TCPServerService.RECEIVE_FINISH -> receiveSucceed()
+                    updateProgress(intent.getLongExtra(TCPSendService.NOW_PROGRESS, 0),
+                        intent.getLongExtra(TCPSendService.LENGTH_PROGRESS, 0), 1)
+                TCPServerService.RECEIVE_FINISH -> tranSucceed(2)
                 TCPServerService.PROGRESS_UPDATE ->
-                    updateReceiveProgress(intent.getLongExtra(TCPServerService.NOW_PROGRESS, 0),
-                        intent.getLongExtra(TCPServerService.LENGTH_PROGRESS, 0))
+                    updateProgress(intent.getLongExtra(TCPServerService.NOW_PROGRESS, 0),
+                        intent.getLongExtra(TCPServerService.LENGTH_PROGRESS, 0), 2)
             }
         }
     }

@@ -24,12 +24,12 @@ import android.widget.ImageButton
 import android.widget.TextView
 import com.example.computernet.service.SendService
 import com.example.computernet.service.ServerService
-import java.util.jar.Manifest
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     companion object{
         var debugMode = 0
     }
+    //recyclerView相关类的声明
     private val adapter = MsgAdapter(deviceList, this)
     private var msgRecyclerView: RecyclerView? = null
     private val context = this
@@ -50,9 +50,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         //设置toolbar
         setSupportActionBar(toolbar)
 
+        //动态申请权限
         requestPermission(listOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
             android.Manifest.permission.READ_EXTERNAL_STORAGE))
 
+        //更换设备名字的按钮
         renameButton.setOnClickListener { view ->
             val et = EditText(this)
             AlertDialog.Builder(this).setTitle("请输入设备名字")
@@ -65,19 +67,22 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             send("#broadcast#connect#name:$deviceName#")
         }
 
-        //设置悬浮按钮，点击则搜索
+        //设置悬浮按钮，点击则发广播，让别人发现自己
         fab.setOnClickListener { view ->
             send("#broadcast#connect#name:$deviceName#")
             Snackbar.make(view, "已成功上线", Snackbar.LENGTH_LONG).setAction("action", null).show()
         }
+        //侧方drawer部件相关设置
         val toggle = ActionBarDrawerToggle(
             this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close
         )
         drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
 
+        //设置drawer按钮的监听
         navView.setNavigationItemSelectedListener(this)
 
+        //recyclerView的初始化
         msgRecyclerView!!.layoutManager = LinearLayoutManager(this)
         msgRecyclerView!!.adapter = adapter
 
@@ -90,6 +95,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         startServer(serverPort, localIp)
     }
 
+    //遍历列表，找出要删除的设备并删除
     private fun removeDevice(deviceAddress: String){
         var i = -1
         for (de in deviceList){
@@ -105,6 +111,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
     }
 
+    //更新设备列表
     private fun refreshDeviceList(device: DeviceInfo){
         var has = false
         for (de in deviceList){
@@ -125,6 +132,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
     }
 
+    //获取广播的IP地址（主机号全为1）
     private fun getBroadcastIp(ip: Int, netMask: Int): String{
         var net: Int = ip and netMask
         net = net or netMask.inv()
@@ -132,6 +140,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     }
 
     override fun onDestroy() {
+        //关闭活动时发出离线消息
         send("#broadcast#disconnect#name:$deviceName#")
         stopServer()
         super.onDestroy()
@@ -142,8 +151,10 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         mLocalBroadcastManager.unregisterReceiver(receiver)
     }
 
+    //注册广播接收器
     override fun onResume() {
         super.onResume()
+        //设置对方为局域网全部设备
         deviceAddress = getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)
         adapter.notifyDataSetChanged()
         val intentFilter = IntentFilter()
@@ -161,22 +172,26 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
     }
 
+    //加载菜单栏
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.main, menu)
         return true
     }
 
+    //菜单栏的监听
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         // Handle action bar item clicks here. The action bar will
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
             R.id.action_quit -> {
+                //关闭应用
                 finish()
                 return true
             }
             R.id.action_clear -> {
+                //删除所有设备信息
                 deviceList.clear()
                 adapter.notifyDataSetChanged()
                 msgRecyclerView!!.scrollToPosition(0)
@@ -228,6 +243,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         return true
     }
 
+    //动态申请权限
     private fun requestPermission(permissionList: List<String>){
         for (permission: String in permissionList){
             if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED){
@@ -239,20 +255,22 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     inner class ServiceBroadcastReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
+                //收到UDP数据
                 ServerService.RECEIVE_MSG -> {
+                    //获取内容
                     val msg: String = intent.getStringExtra("msg")
+                    //获取对方IP地址
                     val address: String = intent.getStringExtra(ServerService.FROM_ADDRESS)
                     Log.e("MainActivity", "收到信息为：$msg")
+                    //检验是不是特殊消息
                     if (Regex("#broadcast#").containsMatchIn(msg)){
                         Log.e("MainActivity", "收到接收发送的广播")
                         val name: String? = Regex("(?<=#name:).*?(?=#)").find(msg)?.value
-                        if (Regex("#connect#").containsMatchIn(msg)){
-                            refreshDeviceList(DeviceInfo(name?:"default", address, mutableListOf(), 0))
-                        }
-                        else if (Regex("#disconnect#").containsMatchIn(msg)){
-                            removeDevice(address)
-                        }else if(Regex("#file#").containsMatchIn(msg)){
-                            for (de in deviceList){
+                        when {
+                            Regex("#connect#").containsMatchIn(msg) -> refreshDeviceList(DeviceInfo(name?:"default", address, mutableListOf(), 0))
+                            Regex("#disconnect#").containsMatchIn(msg) -> removeDevice(address)
+                            Regex("#file#").containsMatchIn(msg) -> for (de in deviceList){
+                                //有人要向本设备发送文件，则弹出对话框
                                 if (de.address == address){
                                     if (de.name != "default"){
                                         AlertDialog.Builder(this@MainActivity).setTitle("${de.name}想向你发送文件")
@@ -277,6 +295,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                             }
                         }
                     }else {
+                        //若不是特殊消息，则判断为用户发送的，记录并提示有多少条未读消息
                         Log.e("MainActivity", "收到聊天信息")
                         for (de in deviceList){
                             if (de.address == address){
