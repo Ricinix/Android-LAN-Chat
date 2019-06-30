@@ -47,7 +47,7 @@ class TCPSendService : IntentService("TCPSendService") {
             val inputStream: InputStream? = cr.openInputStream(Uri.parse(url))
 //            val fileInputStream = FileInputStream(File(url))
             var len = 0
-            val buffer = ByteArray(1024)
+            val buffer = ByteArray(10240)
             var total: Long = 0
 
             while (inputStream!!.read(buffer).also { len = it } != -1 ){

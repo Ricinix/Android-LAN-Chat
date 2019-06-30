@@ -1,5 +1,6 @@
 package com.example.computernet
 
+import android.app.Notification
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -27,6 +28,8 @@ import android.provider.MediaStore
 import android.provider.DocumentsContract
 import android.content.ContentUris
 import android.database.Cursor
+import android.graphics.BitmapFactory
+import android.support.v4.app.NotificationCompat
 
 
 class ChatActivity : BaseActivity() {
@@ -103,6 +106,7 @@ class ChatActivity : BaseActivity() {
             send("#broadcast#file#size:${file.length()}#name:${file.name}#")
 //            fileTrans(path ?: "", file.length())
             size = file.length()
+            path = data?.dataString
         }
     }
 
@@ -117,6 +121,10 @@ class ChatActivity : BaseActivity() {
         val intentFilter = IntentFilter()
         intentFilter.addAction(SendService.SEND_FINISH)
         intentFilter.addAction(ServerService.RECEIVE_MSG)
+        intentFilter.addAction(TCPSendService.PROGRESS_UPDATE)
+        intentFilter.addAction(TCPSendService.SEND_FINISH)
+        intentFilter.addAction(TCPServerService.PROGRESS_UPDATE)
+        intentFilter.addAction(TCPServerService.RECEIVE_FINISH)
         mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
     }
 
@@ -287,12 +295,68 @@ class ChatActivity : BaseActivity() {
         finish()
     }
 
+    private fun updateReceiveProgress(now: Long, length: Long){
+        val progress: Int = ((now * 100) / length).toInt()
+        val notification = NotificationCompat.Builder(this, "Progress")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
+            .setContentTitle("文件传输")
+            .setContentText("$progress%")
+            .setProgress(100, progress, false)
+            .build()
+        notification.flags = Notification.FLAG_ONGOING_EVENT
+        mNotificationManager.notify(1, notification)
+    }
+
+    private fun updateSendProgress(now: Long, length: Long){
+        val progress: Int = ((now * 100) / length).toInt()
+        val notification = NotificationCompat.Builder(this, "Progress")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
+            .setContentTitle("文件传输")
+            .setContentText("$progress%")
+            .setProgress(100, progress, false)
+            .build()
+        notification.flags = Notification.FLAG_ONGOING_EVENT
+        mNotificationManager.notify(2, notification)
+    }
+
+    private fun receiveSucceed(){
+        mNotificationManager.cancel(1)
+        val notification = NotificationCompat.Builder(this, "Progress")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
+            .setContentTitle("传输文件")
+            .setContentText("已完成")
+            .build()
+        mNotificationManager.notify(3, notification)
+    }
+
+    private fun sendSucceed(){
+        mNotificationManager.cancel(2)
+        val notification = NotificationCompat.Builder(this, "Progress")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
+            .setContentTitle("传输文件")
+            .setContentText("已完成")
+            .build()
+        mNotificationManager.notify(3, notification)
+    }
+
     inner class ChatReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
                 ServerService.RECEIVE_MSG -> receive(intent.getStringExtra("msg"),
                     intent.getStringExtra(ServerService.FROM_ADDRESS))
                 SendService.SEND_FINISH -> refreshSendMsg(intent.getStringExtra("msg"))
+                TCPSendService.SEND_FINISH -> sendSucceed()
+                TCPSendService.PROGRESS_UPDATE ->
+                    updateSendProgress(intent.getLongExtra(TCPSendService.NOW_PROGRESS, 0),
+                        intent.getLongExtra(TCPSendService.LENGTH_PROGRESS, 0))
+                TCPServerService.RECEIVE_FINISH -> receiveSucceed()
+                TCPServerService.PROGRESS_UPDATE ->
+                    updateReceiveProgress(intent.getLongExtra(TCPServerService.NOW_PROGRESS, 0),
+                        intent.getLongExtra(TCPServerService.LENGTH_PROGRESS, 0))
             }
         }
     }

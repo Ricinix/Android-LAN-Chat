@@ -51,7 +51,7 @@ class TCPServerService : IntentService("TCPServerService") {
 
             val inStream: InputStream = connect.getInputStream()
             val fileOutputStream  = FileOutputStream(f)
-            val buffer = ByteArray(1024)
+            val buffer = ByteArray(10240)
             var len: Int = 0
             var total: Long = 0
             while (inStream.read(buffer).also { len = it } != -1 ){
