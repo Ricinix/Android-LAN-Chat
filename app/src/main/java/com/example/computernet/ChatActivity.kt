@@ -114,6 +114,8 @@ class ChatActivity : BaseActivity() {
 //            fileTrans(path ?: "", file.length())
             size = file.length()
             path = data?.dataString
+            if (!connected)
+                Toast.makeText(this, "对方不在线", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -197,6 +199,7 @@ class ChatActivity : BaseActivity() {
                     connected = true
                     setTitle(true)
                 }
+                sendToTarget("#broadcast#confirm#name:$deviceName", address)
             }else if(connected and Regex("#broadcast#disconnect#").containsMatchIn(msgText)){
                 //判断是否有人离线
                 var i = -1
@@ -213,6 +216,22 @@ class ChatActivity : BaseActivity() {
                         connected = false
                         setTitle(false)
                     }
+                }
+            }else if(Regex("#broadcast#confirm#").containsMatchIn(msgText)){
+                var has = false
+                for (de in deviceList){
+                    if (address == de.address)
+                        has = true
+                }
+                if (address == localIp){
+                    has = true
+                }
+                if (!has){
+                    deviceList.add(DeviceInfo(name?:"default", address, mutableListOf(), 0))
+                }
+                if (address == deviceAddress){
+                    connected = true
+                    setTitle(true)
                 }
             }else if(Regex("#broadcast#file#").containsMatchIn(msgText)){
                 //若是文件传输的请求
@@ -240,9 +259,23 @@ class ChatActivity : BaseActivity() {
                 }
             }
         }else {
-            mList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
-            adapter.notifyItemChanged(mList.size - 1)
-            recyclerView!!.scrollToPosition(mList.size - 1)
+            if (address == deviceAddress){
+                mList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
+                adapter.notifyItemChanged(mList.size - 1)
+                recyclerView!!.scrollToPosition(mList.size - 1)
+            }else{
+                var i = -1
+                for (de in deviceList){
+                    i++
+                    if (de.address == address){
+                        break
+                    }
+                }
+                if (i >= 0){
+                    deviceList[i].chatList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
+                    deviceList[i].new++
+                }
+            }
         }
     }
 

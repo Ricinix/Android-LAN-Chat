@@ -40,6 +40,15 @@ open class BaseActivity: AppCompatActivity(){
         startService(intent)
     }
 
+    //向特定IP地址发送UDP
+    fun sendToTarget(msgText: String, ip: String){
+        val intent = Intent(this, SendService::class.java)
+        intent.putExtra(SendService.CONTENT, msgText)
+        intent.putExtra(SendService.IP_ADDRESS, ip)
+        intent.putExtra(SendService.PORT, sendPort)
+        startService(intent)
+    }
+
     //停止UDP的接收监听
     fun stopServer(){
         mLocalBroadcastManager.sendBroadcast(Intent(ServerService.STOP_SERVER))
