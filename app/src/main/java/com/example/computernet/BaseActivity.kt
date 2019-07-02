@@ -15,12 +15,9 @@ import com.example.computernet.service.ServerService
 open class BaseActivity: AppCompatActivity(){
 
     companion object{
-        @JvmStatic
-        private val TAG = "BaseActivity"
-        var serverPort: Int = 11791
-        var sendPort: Int = 11791
+        const val UdpPort: Int = 11791
         const val TcpPort: Int = 11697
-        var deviceAddress: String = "255"
+        var deviceAddress: String = ""
         var deviceName: String = "default"
         val deviceList = mutableListOf<DeviceInfo>()
     }
@@ -36,7 +33,7 @@ open class BaseActivity: AppCompatActivity(){
         val intent = Intent(this, SendService::class.java)
         intent.putExtra(SendService.CONTENT, msgText)
         intent.putExtra(SendService.IP_ADDRESS, deviceAddress)
-        intent.putExtra(SendService.PORT, sendPort)
+        intent.putExtra(SendService.PORT, UdpPort)
         startService(intent)
     }
 
@@ -45,7 +42,7 @@ open class BaseActivity: AppCompatActivity(){
         val intent = Intent(this, SendService::class.java)
         intent.putExtra(SendService.CONTENT, msgText)
         intent.putExtra(SendService.IP_ADDRESS, ip)
-        intent.putExtra(SendService.PORT, sendPort)
+        intent.putExtra(SendService.PORT, UdpPort)
         startService(intent)
     }
 
@@ -75,7 +72,9 @@ open class BaseActivity: AppCompatActivity(){
 
     //IP地址的转换
     fun intToIp(paramInt: Int): String {
-        return ((paramInt and 0xFF).toString() + "." + (0xFF and (paramInt shr 8)) + "." + (0xFF and (paramInt shr 16)) + "."
+        return ((paramInt and 0xFF).toString() + "."
+                + (0xFF and (paramInt shr 8)) + "."
+                + (0xFF and (paramInt shr 16)) + "."
                 + (0xFF and (paramInt shr 24)))
     }
 

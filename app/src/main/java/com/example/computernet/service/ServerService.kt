@@ -31,12 +31,11 @@ class ServerService : IntentService("ServerService") {
         intentFilter.addAction(STOP_SERVER)
         val receiver = ServerReceiver()
         mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
-        val port: Int? = intent?.getIntExtra(PORT, 11791)
-        var localIp: String? = intent?.getStringExtra(LOCAL_HOST)
-        localIp = "/$localIp"
+        val port: Int = intent?.getIntExtra(PORT, 11791) ?: 11791
+        val localIp: String? = intent?.getStringExtra(LOCAL_HOST)
         //包装IP地址
         //创建服务端的DatagramSocket对象，需要传入端口号
-        service = DatagramSocket(port!!)
+        service = DatagramSocket(port)
 
         var receiveAddress: String
         var receiveMsg: String
@@ -60,7 +59,7 @@ class ServerService : IntentService("ServerService") {
                 receiveAddress = receiveAddress.substring(1, receiveAddress.length)
                 Log.e("ServerService", "该数据包来自:$receiveAddress")
                 //跳过自己发送的数据
-                if (receivePacket.address.toString() == localIp)
+                if (receiveAddress == localIp)
                     continue
                 receiveMsg = String(receivePacket.data, 0, receivePacket.length)
 
@@ -70,7 +69,7 @@ class ServerService : IntentService("ServerService") {
             e.printStackTrace()
         } finally {
             //关闭DatagramSocket对象
-            service.close()
+            service.takeIf { service.isConnected }?.close()
         }
         mLocalBroadcastManager.unregisterReceiver(receiver)
         Log.e("ServerService", "server关闭")
@@ -90,10 +89,11 @@ class ServerService : IntentService("ServerService") {
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
                 STOP_SERVER -> {
-                    service.close()
+                    service.takeIf { it.isConnected }?.close()
                     running = false
                 }
             }
         }
+
     }
 }

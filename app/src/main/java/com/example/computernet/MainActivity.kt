@@ -92,22 +92,17 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         Log.e("MainActivity", "网关：${intToIp(dhcpInfo.gateway)}")
 
         send("#broadcast#connect#name:$deviceName#")
-        startServer(serverPort, localIp)
+        startServer(UdpPort, localIp)
     }
 
     //遍历列表，找出要删除的设备并删除
     private fun removeDevice(deviceAddress: String){
-        var i = -1
         for (de in deviceList){
-            i++
             if (de.address == deviceAddress){
-                break
+                Log.e("MainActivity", "正在删除$deviceAddress，总共有${deviceList.size}个")
+                deviceList -= de
+                adapter.notifyDataSetChanged()
             }
-        }
-        if (i >= 0){
-            Log.e("MainActivity", "正在删除第${i}个，总共有${deviceList.size}个")
-            deviceList.removeAt(i)
-            adapter.notifyDataSetChanged()
         }
     }
 
@@ -134,6 +129,36 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             sendToTarget("#broadcast#confirm#name:$deviceName#", device.address)
     }
 
+    //当接收到传输文件的请求时
+    private fun receiveFileRequest(address: String, msg: String){
+        for (de in deviceList){
+            //有人要向本设备发送文件，则弹出对话框
+            if (de.address == address){
+                AlertDialog.Builder(this@MainActivity).setTitle("${
+                if(de.name != "default"){de.name}else{de.address}}想向你发送文件")
+                    .setIcon(android.R.drawable.sym_def_app_icon)
+                    .setPositiveButton("确定接收") { p0, p1 ->
+                        ChatActivity.startThisActivity(
+                            this@MainActivity, address, true, msg)
+                    }.setNegativeButton("拒绝接收"){ p0, p1 ->
+                        send("#broadcast#file#refuse#")
+                    }.show()
+            }
+        }
+    }
+
+    //收到聊天记录，更新小圆点提示
+    private fun receiveChatMsg(address: String, msg: String){
+        Log.e("MainActivity", "收到聊天信息")
+        for (de in deviceList){
+            if (de.address == address){
+                de.chatList.add(ChatMsg(msg, ChatMsg.TYPE_RECEIVED))
+                de.new++
+                adapter.notifyDataSetChanged()
+            }
+        }
+    }
+
     //获取广播的IP地址（主机号全为1）
     private fun getBroadcastIp(ip: Int, netMask: Int): String{
         var net: Int = ip and netMask
@@ -141,13 +166,14 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         return intToIp(net)
     }
 
+    //关闭活动时发出离线消息
     override fun onDestroy() {
-        //关闭活动时发出离线消息
         send("#broadcast#disconnect#name:$deviceName#")
         stopServer()
         super.onDestroy()
     }
 
+    //不可见时注销广播接收器
     override fun onPause() {
         super.onPause()
         mLocalBroadcastManager.unregisterReceiver(receiver)
@@ -159,12 +185,14 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         //设置对方为局域网全部设备
         deviceAddress = getBroadcastIp(dhcpInfo.ipAddress, dhcpInfo.netmask)
         adapter.notifyDataSetChanged()
+        //设置广播接收器
         val intentFilter = IntentFilter()
         intentFilter.addAction(ServerService.RECEIVE_MSG)
         intentFilter.addAction(SendService.SEND_FINISH)
         mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
     }
 
+    //drawer的相关操作
     override fun onBackPressed() {
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
@@ -190,19 +218,20 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             R.id.action_quit -> {
                 //关闭应用
                 finish()
-                return true
+                true
             }
             R.id.action_clear -> {
                 //删除所有设备信息
                 deviceList.clear()
                 adapter.notifyDataSetChanged()
                 msgRecyclerView!!.scrollToPosition(0)
-                return true
+                true
             }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
+    //drawer的按钮监听
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         // Handle navigation view item clicks here.
         when (item.itemId) {
@@ -219,10 +248,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             R.id.nav_tools -> {
                 if (debugMode == 0){
                     debugMode = 1
-                    val deviceTest1 = DeviceInfo("test device 1","1.1.1.1", mutableListOf(), 0)
-                    deviceList.add(deviceTest1)
-                    val deviceTest2 = DeviceInfo("test device 2", "1.1.1.1", mutableListOf(), 0)
-                    deviceList.add(deviceTest2)
+                    deviceList.add(DeviceInfo("test device 1","1.1.1.1", mutableListOf(), 0))
+                    deviceList.add(DeviceInfo("test device 2", "1.1.1.1", mutableListOf(), 0))
                     adapter.notifyItemChanged(deviceList.size - 1)
                     msgRecyclerView!!.scrollToPosition(deviceList.size - 1)
                 }else{
@@ -231,7 +258,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                     adapter.notifyDataSetChanged()
                     msgRecyclerView!!.scrollToPosition(0)
                 }
-
             }
             R.id.nav_share -> {
 
@@ -254,6 +280,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
     }
 
+    //广播接收器
     inner class ServiceBroadcastReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
@@ -267,47 +294,23 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                     //检验是不是特殊消息
                     if (Regex("#broadcast#").containsMatchIn(msg)){
                         Log.e("MainActivity", "收到接收发送的广播")
-                        val name: String? = Regex("(?<=#name:).*?(?=#)").find(msg)?.value
-                        if (Regex("#connect#").containsMatchIn(msg))
-                            refreshDeviceList(DeviceInfo(name?:"default", address, mutableListOf(), 0), true)
-                        else if (Regex("#disconnect#").containsMatchIn(msg))
-                            removeDevice(address)
-                        else if(Regex("#broadcast#confirm#").containsMatchIn(msg))
-                            refreshDeviceList(DeviceInfo(name?:"default", address, mutableListOf(), 0), false)
-                        else if (Regex("#file#").containsMatchIn(msg)) for (de in deviceList){
-                            //有人要向本设备发送文件，则弹出对话框
-                            if (de.address == address){
-                                if (de.name != "default"){
-                                    AlertDialog.Builder(this@MainActivity).setTitle("${de.name}想向你发送文件")
-                                        .setIcon(android.R.drawable.sym_def_app_icon)
-                                        .setPositiveButton("确定接收") { p0, p1 ->
-                                            ChatActivity.startThisActivity(
-                                                this@MainActivity, address, true, msg)
-                                        }.setNegativeButton("拒绝接收"){ p0, p1 ->
-                                            send("#broadcast#file#refuse#")
-                                        }.show()
-                                }else{
-                                    AlertDialog.Builder(this@MainActivity).setTitle("${de.address}想向你发送文件")
-                                        .setIcon(android.R.drawable.sym_def_app_icon)
-                                        .setPositiveButton("确定接收") { p0, p1 ->
-                                            ChatActivity.startThisActivity(
-                                                this@MainActivity, address, true, msg)
-                                        }.setNegativeButton("拒绝接收"){ p0, p1 ->
-                                            send("#broadcast#file#refuse#")
-                                        }.show()
-                                }
+                        val name: String = Regex("(?<=#name:).*?(?=#)").find(msg)?.value ?: "default"
+                        when {
+                            Regex("#connect#").containsMatchIn(msg) -> {
+                                refreshDeviceList(DeviceInfo(name, address, mutableListOf(), 0), true)
                             }
+                            Regex("#disconnect#").containsMatchIn(msg) -> {
+                                removeDevice(address)
+                            }
+                            Regex("#broadcast#confirm#").containsMatchIn(msg) -> {
+                                refreshDeviceList(DeviceInfo(name, address, mutableListOf(), 0), false)
+                            }
+                            Regex("#file#").containsMatchIn(msg) ->
+                                receiveFileRequest(address, msg)
                         }
                     }else {
                         //若不是特殊消息，则判断为用户发送的，记录并提示有多少条未读消息
-                        Log.e("MainActivity", "收到聊天信息")
-                        for (de in deviceList){
-                            if (de.address == address){
-                                de.chatList.add(ChatMsg(msg, ChatMsg.TYPE_RECEIVED))
-                                de.new++
-                                adapter.notifyDataSetChanged()
-                            }
-                        }
+                        receiveChatMsg(address, msg)
                     }
 
                 }

@@ -1,7 +1,10 @@
 package com.example.computernet.service
 
 import android.app.IntentService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.support.v4.content.LocalBroadcastManager
 import android.util.Log
 import java.io.File
@@ -20,22 +23,25 @@ class TCPServerService : IntentService("TCPServerService") {
 
         const val PROGRESS_UPDATE: String = "tcp_server_service_progress_update"
         const val RECEIVE_FINISH: String = "tcp_server_service_receive_finish"
+        const val SHUTDOWN: String = "tcp_server_service_receive_shutdown"
     }
 
-    private lateinit var mLocalBroadcastManager: LocalBroadcastManager
-    override fun onCreate() {
-        super.onCreate()
-        mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
-    }
+    private val mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
+    private val receiver = TcpServerReceiver()
+    private lateinit var serverSocket: ServerSocket
+    private lateinit var connect: Socket
 
     override fun onHandleIntent(intent: Intent?) {
         val port: Int = intent?.getIntExtra(PORT, 11697) ?: 11697
         val path: String = intent?.getStringExtra(FILE_URL) ?: ""
         val fileSize: Long = intent?.getLongExtra(LENGTH_PROGRESS, 100) ?: 100
+        val intentFilter = IntentFilter(SHUTDOWN)
+        mLocalBroadcastManager.registerReceiver(receiver, intentFilter)
         try {
-            val serverSocket = ServerSocket(port)
+            serverSocket = ServerSocket(port)
+            serverSocket.soTimeout = 3000
             //连接socket
-            val connect: Socket = serverSocket.accept()
+            connect = serverSocket.accept()
             Log.e("TcpServerService", "已成功启动TcpServer")
             Log.e("TcpServerService", "路径为$path")
             //打开文件
@@ -72,6 +78,7 @@ class TCPServerService : IntentService("TCPServerService") {
         }finally {
             Log.e("TcpServerService", "已结束")
         }
+        mLocalBroadcastManager.unregisterReceiver(receiver)
     }
 
     //更新进度条
@@ -88,5 +95,18 @@ class TCPServerService : IntentService("TCPServerService") {
         Log.e("TcpServerService", "成功接收文件")
         val intent = Intent(RECEIVE_FINISH)
         mLocalBroadcastManager.sendBroadcast(intent)
+    }
+
+    //关闭TCP server
+    inner class TcpServerReceiver: BroadcastReceiver(){
+        override fun onReceive(p0: Context?, intent: Intent?) {
+            when (intent?.action){
+                SHUTDOWN -> {
+                    serverSocket.takeIf { !it.isClosed }?.close()
+                    connect.takeIf { it.isConnected }?.close()
+                }
+            }
+        }
+
     }
 }

@@ -97,26 +97,56 @@ class ChatActivity : BaseActivity() {
             val msgText: String = intent.getStringExtra("msg")
             val fileSize: Long = Regex("(?<=#size:).*?(?=#)").find(msgText)?.value?.toLong() ?: 0
             val fileName: String = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value ?: "download"
-            val url = Environment.DIRECTORY_DOWNLOADS + "/" + fileName
-            receiveFile(fileSize, url)
+            val uri = Environment.DIRECTORY_DOWNLOADS + "/" + fileName
+            receiveFile(fileSize, uri)
         }
     }
 
-    //获取要发送文件的路径
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == 1){
-            val uri: Uri? = data?.data
-            path = getPath(this,uri)
-            Log.e("ChatActivity", "选择的文件路径为$path")
-            val file = File(path)
-            Log.e("ChatActivity", "已发送传输请求，等待确认，文件名为${file.name}, 文件大小为${file.length()}")
-            send("#broadcast#file#size:${file.length()}#name:${file.name}#")
-//            fileTrans(path ?: "", file.length())
-            size = file.length()
-            path = data?.dataString
-            if (!connected)
-                Toast.makeText(this, "对方不在线", Toast.LENGTH_LONG).show()
+    //获取对应设备的聊天记录
+    private fun getList(address: String){
+        for (de in deviceList){
+            if (de.address == address){
+                mList = de.chatList
+                targetName = de.name
+            }
         }
+    }
+
+    //设置标题
+    private fun setTitle(connect: Boolean){
+        supportActionBar?.run {
+            title = if (targetName != "default"){
+                targetName + if (connect){"(已连接)"}else{"(未连接)"}
+            }else {
+                deviceAddress + if (connect){"(已连接)"}else{"(未连接)"}
+            }
+        }
+    }
+
+    //判断对方是否在线
+    private fun isConnected(address: String){
+        for (de in deviceList){
+            if (de.address == address){
+                connected = true
+                setTitle(true)
+                de.new = 0
+            }
+        }
+    }
+
+    //接收文件
+    private fun receiveFile(size: Long, uri: String){
+        AlertDialog.Builder(this).setTitle("对方想给你发送一个文件")
+            .setIcon(android.R.drawable.sym_def_app_icon)
+            .setPositiveButton("接收") { _, _ ->
+                //启动TCP服务端的服务
+                startTcpServer(size, uri)
+                //发送确认应答
+                send("#broadcast#file#confirm#")
+            }.setNegativeButton("拒绝") { _, _ ->
+                //发送拒绝应答
+                send("#broadcast#file#refuse#")
+            }.show()
     }
 
     //活动不可见时注销广播接收器
@@ -149,31 +179,24 @@ class ChatActivity : BaseActivity() {
     override fun onOptionsItemSelected(item: MenuItem?): Boolean {
         when(item!!.itemId){
             android.R.id.home -> quit()
-            R.id.action_file_send -> {
-                chooseFile()
-            }
+            R.id.action_file_send -> chooseFile()
         }
         return super.onOptionsItemSelected(item)
     }
 
-    //获取对应设备的聊天记录
-    private fun getList(address: String){
-        for (de in deviceList){
-            if (de.address == address){
-                mList = de.chatList
-                targetName = de.name
-            }
-        }
-    }
-
-    //判断对方是否在线
-    private fun isConnected(address: String){
-        for (de in deviceList){
-            if (de.address == address){
-                connected = true
-                setTitle(true)
-                de.new = 0
-            }
+    //获取要发送文件的路径
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == 1){
+            val uri: Uri? = data?.data
+            path = getPath(this,uri)
+            Log.e("ChatActivity", "选择的文件路径为$path")
+            val file = File(path)
+            Log.e("ChatActivity", "已发送传输请求，等待确认，文件名为${file.name}, 文件大小为${file.length()}")
+            send("#broadcast#file#size:${file.length()}#name:${file.name}#")
+            size = file.length()
+            path = data?.dataString
+            if (!connected)
+                Toast.makeText(this, "对方不在线", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -181,82 +204,64 @@ class ChatActivity : BaseActivity() {
     private fun receive(msgText: String, address: String){
         //判断是不是特殊消息
         if (Regex("#broadcast#").containsMatchIn(msgText)){
-            val name: String? = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value
+            val name: String = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value ?: "default"
             //判断是否有人上线
-            if (Regex("#connect#").containsMatchIn(msgText)){
-                var has = false
-                for (de in deviceList){
-                    if (address == de.address)
-                        has = true
-                }
-                if (address == localIp){
-                    has = true
-                }
-                if (!has){
-                    deviceList.add(DeviceInfo(name?:"default", address, mutableListOf(), 0))
-                }
-                if (address == deviceAddress){
-                    connected = true
-                    setTitle(true)
-                }
-                sendToTarget("#broadcast#confirm#name:$deviceName", address)
-            }else if(connected and Regex("#broadcast#disconnect#").containsMatchIn(msgText)){
-                //判断是否有人离线
-                var i = -1
-                for (de in deviceList){
-                    i++
-                    if (de.address == address){
-                        break
+            when {
+                Regex("#connect#").containsMatchIn(msgText) -> {
+                    if (!hasDevice(address)){
+                        deviceList.add(DeviceInfo(name, address, mutableListOf(), 0))
                     }
-                }
-                if (i >= 0){
-                    deviceList.removeAt(i)
-                    //若是当前聊天的人，则设置为未连接
                     if (address == deviceAddress){
-                        connected = false
-                        setTitle(false)
+                        connected = true
+                        setTitle(true)
+                    }
+                    sendToTarget("#broadcast#confirm#name:$deviceName", address)
+                }
+                Regex("#disconnect#").containsMatchIn(msgText) -> {
+                    //判断是否有人离线
+                    for (de in deviceList){
+                        if (de.address == address){
+                            deviceList -= de
+                            //若是当前聊天的人，则设置为未连接
+                            if (address == deviceAddress){
+                                connected = false
+                                setTitle(false)
+                            }
+                        }
                     }
                 }
-            }else if(Regex("#broadcast#confirm#").containsMatchIn(msgText)){
-                var has = false
-                for (de in deviceList){
-                    if (address == de.address)
-                        has = true
-                }
-                if (address == localIp){
-                    has = true
-                }
-                if (!has){
-                    deviceList.add(DeviceInfo(name?:"default", address, mutableListOf(), 0))
-                }
-                if (address == deviceAddress){
-                    connected = true
-                    setTitle(true)
-                }
-            }else if(Regex("#broadcast#file#").containsMatchIn(msgText)){
-                //若是文件传输的请求
-                when {
-                    //对方拒绝接收文件
-                    Regex("#refuse#").containsMatchIn(msgText) -> {
-                        Log.e("ChatActivity", "对方拒绝接收")
-                        Toast.makeText(this, "对方拒绝接收", Toast.LENGTH_LONG).show()
-                        val intent = Intent(TCPSendService.SEND_SHUTDOWN)
-                        mLocalBroadcastManager.sendBroadcast(intent)
+                Regex("#broadcast#confirm#").containsMatchIn(msgText) -> {
+                    if (!hasDevice(address)){
+                        deviceList.add(DeviceInfo(name, address, mutableListOf(), 0))
                     }
-                    //收到对方的确认
-                    Regex("#confirm#").containsMatchIn(msgText) -> {
-                        Log.e("ChatActivity", "收到传输请求的确认，开始传输文件")
-                        fileTrans()
+                    if (address == deviceAddress){
+                        connected = true
+                        setTitle(true)
                     }
-                    //收到传输请求
-                    else -> {
-                        val fileSize: Long = Regex("(?<=#size:).*?(?=#)").find(msgText)?.value?.toLong() ?: 0
-                        val fileName: String = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value ?: "download"
-                        val url = Environment.getExternalStorageDirectory().absolutePath + "/Download/" + fileName
+                }
+                Regex("#broadcast#file#").containsMatchIn(msgText) -> //若是文件传输的请求
+                    when {
+                        //对方拒绝接收文件
+                        Regex("#refuse#").containsMatchIn(msgText) -> {
+                            Log.e("ChatActivity", "对方拒绝接收")
+                            Toast.makeText(this, "对方拒绝接收", Toast.LENGTH_LONG).show()
+                            val intent = Intent(TCPSendService.SEND_SHUTDOWN)
+                            mLocalBroadcastManager.sendBroadcast(intent)
+                        }
+                        //收到对方的确认
+                        Regex("#confirm#").containsMatchIn(msgText) -> {
+                            Log.e("ChatActivity", "收到传输请求的确认，开始传输文件")
+                            fileTrans()
+                        }
+                        //收到传输请求
+                        else -> {
+                            val fileSize: Long = Regex("(?<=#size:).*?(?=#)").find(msgText)?.value?.toLong() ?: 0
+                            val fileName: String = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value ?: "download"
+                            val uri = Environment.getExternalStorageDirectory().absolutePath + "/Download/" + fileName
 
-                        receiveFile(fileSize, url)
+                            receiveFile(fileSize, uri)
+                        }
                     }
-                }
             }
         }else {
             if (address == deviceAddress){
@@ -264,71 +269,34 @@ class ChatActivity : BaseActivity() {
                 adapter.notifyItemChanged(mList.size - 1)
                 recyclerView!!.scrollToPosition(mList.size - 1)
             }else{
-                var i = -1
                 for (de in deviceList){
-                    i++
                     if (de.address == address){
-                        break
+                        de.chatList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
+                        de.new++
                     }
-                }
-                if (i >= 0){
-                    deviceList[i].chatList.add(ChatMsg(msgText, ChatMsg.TYPE_RECEIVED))
-                    deviceList[i].new++
                 }
             }
         }
-    }
-
-    //接收文件
-    private fun receiveFile(size: Long, url: String){
-        AlertDialog.Builder(this).setTitle("对方想给你发送一个文件")
-                .setIcon(android.R.drawable.sym_def_app_icon)
-                .setPositiveButton("接收") { p0, p1 ->
-                    //启动TCP服务端的服务
-                    startTcpServer(size, url)
-                    //发送确认应答
-                    send("#broadcast#file#confirm#")
-                }.setNegativeButton("拒绝") { p0, p1 ->
-                //发送拒绝应答
-                send("#broadcast#file#refuse#")
-            }.show()
     }
 
     //开启TCP服务端服务
-    private fun startTcpServer(size: Long, url: String){
+    private fun startTcpServer(size: Long, uri: String){
         val intent = Intent(this, TCPServerService::class.java)
         intent.putExtra(TCPServerService.PORT, TcpPort)
         intent.putExtra(TCPServerService.LENGTH_PROGRESS, size)
-        intent.putExtra(TCPServerService.FILE_URL, url)
+        intent.putExtra(TCPServerService.FILE_URL, uri)
         startService(intent)
     }
 
-    //设置标题
-    private fun setTitle(connect: Boolean){
-        if (targetName != "default"){
-            if (connect){
-                supportActionBar?.title = "$targetName(已连接)"
-            }else {
-                supportActionBar?.title = "$targetName(未连接)"
-            }
-        }else{
-            if (connect){
-                supportActionBar?.title = "$deviceAddress(已连接)"
-            }else{
-                supportActionBar?.title = "$deviceAddress(未连接)"
-            }
-        }
-    }
-
-    //刷新聊天信息
+    //刷新聊天中发送出去的信息
     private fun refreshSendMsg(msgText: String){
         if (!Regex("#broadcast#").containsMatchIn(msgText)){
             //如果连接，正常发送
-            if (connected){
-                mList.add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
-            }
-            else{
-                mList.add(ChatMsg(msgText, ChatMsg.TYPE_WRONG))
+            mList.run {
+                if (connected)
+                    add(ChatMsg(msgText, ChatMsg.TYPE_SEND))
+                else
+                    add(ChatMsg(msgText, ChatMsg.TYPE_WRONG))
             }
             adapter.notifyItemChanged(mList.size - 1)
             recyclerView!!.scrollToPosition(mList.size - 1)
@@ -390,15 +358,20 @@ class ChatActivity : BaseActivity() {
     inner class ChatReceiver: BroadcastReceiver(){
         override fun onReceive(p0: Context?, intent: Intent?) {
             when (intent?.action){
-                //接收广播，发通知
+                //接收到UDP信息
                 ServerService.RECEIVE_MSG -> receive(intent.getStringExtra("msg"),
                     intent.getStringExtra(ServerService.FROM_ADDRESS))
+                //发送UDP成功
                 SendService.SEND_FINISH -> refreshSendMsg(intent.getStringExtra("msg"))
+                //发送TCP成功
                 TCPSendService.SEND_FINISH -> tranSucceed(1)
+                //更新进度条
                 TCPSendService.PROGRESS_UPDATE ->
                     updateProgress(intent.getLongExtra(TCPSendService.NOW_PROGRESS, 0),
                         intent.getLongExtra(TCPSendService.LENGTH_PROGRESS, 0), 1)
+                //接收TCP完成
                 TCPServerService.RECEIVE_FINISH -> tranSucceed(2)
+                //更新进度条
                 TCPServerService.PROGRESS_UPDATE ->
                     updateProgress(intent.getLongExtra(TCPServerService.NOW_PROGRESS, 0),
                         intent.getLongExtra(TCPServerService.LENGTH_PROGRESS, 0), 2)
@@ -415,6 +388,19 @@ class ChatActivity : BaseActivity() {
             intent.putExtra("deviceAddress", deviceAddress)
             context.startActivity(intent)
         }
+    }
+
+    //判断列表中是否有该设备
+    private fun hasDevice(address: String): Boolean{
+        var has = false
+        for (de in deviceList){
+            if (address == de.address)
+                has = true
+        }
+        if (address == localIp){
+            has = true
+        }
+        return has
     }
 
     //uri解析

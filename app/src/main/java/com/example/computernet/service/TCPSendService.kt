@@ -28,12 +28,8 @@ class TCPSendService : IntentService("TCPSendService") {
         const val SEND_SHUTDOWN: String = "tcp_send_service_send_shutdown"
     }
 
-    private lateinit var mLocalBroadcastManager: LocalBroadcastManager
+    private val mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
     private lateinit var client: Socket
-    override fun onCreate() {
-        super.onCreate()
-        mLocalBroadcastManager = LocalBroadcastManager.getInstance(this)
-    }
 
     override fun onHandleIntent(intent: Intent?) {
         val url: String = intent?.getStringExtra(URL) ?: ""

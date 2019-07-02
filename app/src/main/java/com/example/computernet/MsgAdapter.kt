@@ -35,17 +35,18 @@ class MsgAdapter(private val mList: List<DeviceInfo>,private val context : Conte
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         //显示设备名，若未设置则显示设备IP地址
-        if (mList[position].name != "default"){
-            holder.textView!!.text = mList[position].name
-        }else {
-            holder.textView!!.text = mList[position].address
+        holder.textView!!.text = mList[position].let {
+            if (mList[position].name != "default") it.name
+            else it.address
         }
         //设置未读消息数目的显示
-        if (mList[position].new == 0){
-            holder.msgNum!!.visibility = View.GONE
-        }else {
-            holder.msgNum!!.visibility = View.VISIBLE
-            holder.msgNum!!.text = mList[position].new.toString()
+        holder.msgNum!!.apply {
+            if (mList[position].new == 0)
+                visibility = View.GONE
+            else{
+                visibility = View.VISIBLE
+                text = mList[position].new.toString()
+            }
         }
     }
 
