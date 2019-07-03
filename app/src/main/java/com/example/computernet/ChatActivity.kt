@@ -98,7 +98,7 @@ class ChatActivity : BaseActivity() {
             val fileSize: Long = Regex("(?<=#size:).*?(?=#)").find(msgText)?.value?.toLong() ?: 0
             val fileName: String = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value ?: "download"
             val uri = Environment.DIRECTORY_DOWNLOADS + "/" + fileName
-            receiveFile(fileSize, uri)
+            receiveFile(fileSize, uri, fileName)
         }
     }
 
@@ -135,9 +135,11 @@ class ChatActivity : BaseActivity() {
     }
 
     //接收文件
-    private fun receiveFile(size: Long, uri: String){
+    private fun receiveFile(size: Long, uri: String, name: String){
+        Log.e("ChatActivity", "size:$size, name: $name")
         AlertDialog.Builder(this).setTitle("对方想给你发送一个文件")
             .setIcon(android.R.drawable.sym_def_app_icon)
+            .setMessage("文件名为$name\n大小为${getReadSize(size)}")
             .setPositiveButton("接收") { _, _ ->
                 //启动TCP服务端的服务
                 startTcpServer(size, uri)
@@ -259,7 +261,7 @@ class ChatActivity : BaseActivity() {
                             val fileName: String = Regex("(?<=#name:).*?(?=#)").find(msgText)?.value ?: "download"
                             val uri = Environment.getExternalStorageDirectory().absolutePath + "/Download/" + fileName
 
-                            receiveFile(fileSize, uri)
+                            receiveFile(fileSize, uri, fileName)
                         }
                     }
             }
@@ -401,6 +403,23 @@ class ChatActivity : BaseActivity() {
             has = true
         }
         return has
+    }
+
+    private fun getReadSize(size: Long): String{
+        var t = 0
+        var temp = size
+        while (temp >= 1024 && t < 3){
+            temp /= 1024
+            t++
+        }
+        return when (t){
+            0 -> "${temp}B"
+            1 -> "${temp}KB"
+            2 -> "${temp}MB"
+            3 -> "${temp}GB"
+            else -> "${size}B"
+        }
+
     }
 
     //uri解析
